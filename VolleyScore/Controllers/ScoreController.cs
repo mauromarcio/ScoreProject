@@ -240,8 +240,12 @@ public class ScoreController : Controller
 
     /// <summary>
     /// Rotates player positions clockwise for the given side.
-    /// In volleyball, when a team earns the serve:
-    ///   player at position 2 → 1 (becomes server), 3→2, 4→3, 5→4, 6→5, 1→6
+    /// Uses delete + re-insert instead of in-place UPDATE to avoid the EF Core
+    /// circular-dependency error that occurs when all 6 rows shift simultaneously
+    /// against the unique index on (MatchId, SetNumber, Side, Position).
+    /// EF Core always executes DELETEs before INSERTs in the same SaveChanges batch,
+    /// so there is no transient unique-constraint conflict.
+    /// Rotation map: 1→6, 2→1, 3→2, 4→3, 5→4, 6→5
     /// </summary>
     private async Task RotatePlayers(int matchId, int setNumber, string side, int rotationIndex)
     {
@@ -249,19 +253,31 @@ public class ScoreController : Controller
             .Where(pp => pp.MatchId == matchId && pp.SetNumber == setNumber && pp.Side == side)
             .ToListAsync();
 
+        if (!positions.Any()) return;
+
+        // Stage all deletes first
+        _context.PlayerPositions.RemoveRange(positions);
+
+        // Stage re-inserts with rotated position numbers
         foreach (var pp in positions)
         {
-            // Rotation: pos 1→6, 2→1, 3→2, 4→3, 5→4, 6→5
-            pp.Position = pp.Position switch
+            _context.PlayerPositions.Add(new PlayerPosition
             {
-                1 => 6,
-                2 => 1,
-                3 => 2,
-                4 => 3,
-                5 => 4,
-                6 => 5,
-                _ => pp.Position
-            };
+                MatchId   = pp.MatchId,
+                SetNumber = pp.SetNumber,
+                PlayerId  = pp.PlayerId,
+                Side      = pp.Side,
+                Position  = pp.Position switch
+                {
+                    1 => 6,
+                    2 => 1,
+                    3 => 2,
+                    4 => 3,
+                    5 => 4,
+                    6 => 5,
+                    _ => pp.Position
+                }
+            });
         }
     }
 
