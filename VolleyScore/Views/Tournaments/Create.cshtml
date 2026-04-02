@@ -1,0 +1,71 @@
+@* File: VolleyScore/Views/Tournaments/Create.cshtml *@
+@model VolleyScore.Models.Tournament
+@{
+    ViewData["Title"] = "New Tournament";
+}
+
+<div class="container py-4" style="max-width:560px">
+    <div class="d-flex align-items-center mb-4">
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h2 class="mb-0">Create Tournament</h2>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form asp-action="Create" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                <div class="mb-3">
+                    <label asp-for="Name" class="form-label fw-semibold">Tournament Name</label>
+                    <input asp-for="Name" class="form-control" placeholder="e.g. City Cup 2025" autofocus />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label fw-semibold">Description <span class="text-muted fw-normal">(optional)</span></label>
+                    <textarea asp-for="Description" class="form-control" rows="2"
+                              placeholder="Short description or notes"></textarea>
+                    <span asp-validation-for="Description" class="text-danger small"></span>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label asp-for="MaxTeams" class="form-label fw-semibold">Max Teams</label>
+                        <input asp-for="MaxTeams" type="number" min="2" max="50" class="form-control" />
+                        <span asp-validation-for="MaxTeams" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="SetsPerMatch" class="form-label fw-semibold">Sets / Match</label>
+                        <select asp-for="SetsPerMatch" class="form-select">
+                            <option value="1">1 set</option>
+                            <option value="2">2 sets</option>
+                            <option value="3">Best of 3</option>
+                            <option value="4">Best of 4</option>
+                            <option value="5">Best of 5</option>
+                        </select>
+                        <span asp-validation-for="SetsPerMatch" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="InitialScore" class="form-label fw-semibold">Handicap</label>
+                        <input asp-for="InitialScore" type="number" min="0" max="24" class="form-control" />
+                        <span asp-validation-for="InitialScore" class="text-danger small"></span>
+                        <div class="form-text">Both teams start each set at this score.</div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i> Create
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

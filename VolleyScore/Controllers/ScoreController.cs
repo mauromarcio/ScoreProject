@@ -81,7 +81,8 @@ public class ScoreController : Controller
             CurrentSetNumber = match.CurrentSetNumber,
             TotalSets = match.TotalSets,
             MatchReference = match.MatchReference,
-            HomeIsServing = currentSet.HomeIsServing
+            HomeIsServing = currentSet.HomeIsServing,
+            HomeTeamOnLeft = match.HomeTeamOnLeft
         };
 
         return View(vm);
@@ -169,7 +170,8 @@ public class ScoreController : Controller
             }
 
             // ── Check for set win ─────────────────────────────────────────────
-            int winThreshold = (match!.CurrentSetNumber == match.TotalSets) ? 15 : 25;
+            // The deciding set (only when TotalSets >= 3) is played to 15; all others to 25.
+            int winThreshold = (match!.TotalSets > 2 && match.CurrentSetNumber == match.TotalSets) ? 15 : 25;
             int homeS = currentSet.HomeScore;
             int awayS = currentSet.AwayScore;
 
@@ -206,7 +208,9 @@ public class ScoreController : Controller
                     {
                         MatchId = match.Id,
                         SetNumber = nextSetNumber,
-                        HomeIsServing = nextHomeServes
+                        HomeIsServing = nextHomeServes,
+                        HomeScore = match.InitialScore,
+                        AwayScore = match.InitialScore
                     };
                     _context.GameSets.Add(nextSet);
                     match.ServingTeamId = nextHomeServes ? match.HomeTeamId : match.AwayTeamId;

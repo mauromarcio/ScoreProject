@@ -210,7 +210,8 @@
     </div>
 
     <!-- Main score area -->
-    <div class="display-score-row">
+    <div class="display-score-row" id="displayScoreRow"
+         style="@(Model.HomeTeamOnLeft ? "" : "flex-direction:row-reverse")">
 
         <!-- Left team (Home) -->
         <div class="display-team" id="displayHomeTeam">
@@ -278,7 +279,8 @@
         awaySetsWon: @Model.AwaySetsWon,
         currentSetNumber: @Model.CurrentSetNumber,
         totalSets: @Model.TotalSets,
-        homeIsServing: @Model.HomeIsServing.ToString().ToLower()
+        homeIsServing: @Model.HomeIsServing.ToString().ToLower(),
+        homeTeamOnLeft: @Model.HomeTeamOnLeft.ToString().ToLower()
     };
 </script>
 <script src="~/js/display.js" asp-append-version="true"></script>

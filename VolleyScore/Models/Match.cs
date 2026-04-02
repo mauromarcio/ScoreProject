@@ -24,9 +24,17 @@ public class Match
     public int AwayTeamId { get; set; }
 
     [Required]
-    [Range(3, 5, ErrorMessage = "Sets must be 3 or 5")]
-    [Display(Name = "Best of Sets")]
-    public int TotalSets { get; set; } = 3;
+    [Range(1, 5, ErrorMessage = "Sets must be between 1 and 5")]
+    [Display(Name = "Sets to Play")]
+    public int TotalSets { get; set; } = 1;
+
+    /// <summary>
+    /// Both teams start each set with this score (fair-play handicap).
+    /// 0 = normal start. Example: 4 means both start the set at 4–4.
+    /// </summary>
+    [Range(0, 24, ErrorMessage = "Initial score must be between 0 and 24")]
+    [Display(Name = "Initial Score (handicap)")]
+    public int InitialScore { get; set; } = 0;
 
     [Display(Name = "Current Set")]
     public int CurrentSetNumber { get; set; } = 1;

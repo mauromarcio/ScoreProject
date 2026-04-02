@@ -19,11 +19,18 @@ public class VolleyScoreContext : DbContext
     public DbSet<GameSet> GameSets { get; set; }
     public DbSet<PlayerPosition> PlayerPositions { get; set; }
 
+    // Tournament system
+    public DbSet<Tournament> Tournaments { get; set; }
+    public DbSet<TournamentTeam> TournamentTeams { get; set; }
+    public DbSet<Pool> Pools { get; set; }
+    public DbSet<PoolTeam> PoolTeams { get; set; }
+    public DbSet<TournamentMatch> TournamentMatches { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Team configuration
+        // Team
         modelBuilder.Entity<Team>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -32,7 +39,7 @@ public class VolleyScoreContext : DbContext
             entity.HasIndex(e => e.Name).IsUnique();
         });
 
-        // Player configuration
+        // Player
         modelBuilder.Entity<Player>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -41,15 +48,15 @@ public class VolleyScoreContext : DbContext
                   .WithMany(t => t.Players)
                   .HasForeignKey(e => e.TeamId)
                   .OnDelete(DeleteBehavior.Cascade);
-            // Unique jersey number per team
             entity.HasIndex(e => new { e.TeamId, e.Number }).IsUnique();
         });
 
-        // Match configuration
+        // Match
         modelBuilder.Entity<Match>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.MatchReference).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.InitialScore).HasDefaultValue(0);
             entity.HasOne(e => e.HomeTeam)
                   .WithMany()
                   .HasForeignKey(e => e.HomeTeamId)
@@ -60,7 +67,7 @@ public class VolleyScoreContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // GameSet configuration
+        // GameSet
         modelBuilder.Entity<GameSet>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -71,7 +78,7 @@ public class VolleyScoreContext : DbContext
             entity.HasIndex(e => new { e.MatchId, e.SetNumber }).IsUnique();
         });
 
-        // PlayerPosition configuration
+        // PlayerPosition
         modelBuilder.Entity<PlayerPosition>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -84,8 +91,88 @@ public class VolleyScoreContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.PlayerId)
                   .OnDelete(DeleteBehavior.Restrict);
-            // One player per position per set per side
             entity.HasIndex(e => new { e.MatchId, e.SetNumber, e.Side, e.Position }).IsUnique();
+        });
+
+        // Tournament
+        modelBuilder.Entity<Tournament>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(300);
+        });
+
+        // TournamentTeam
+        modelBuilder.Entity<TournamentTeam>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Tournament)
+                  .WithMany(t => t.TournamentTeams)
+                  .HasForeignKey(e => e.TournamentId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Team)
+                  .WithMany()
+                  .HasForeignKey(e => e.TeamId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.TournamentId, e.TeamId }).IsUnique();
+        });
+
+        // Pool
+        modelBuilder.Entity<Pool>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
+            entity.HasOne(e => e.Tournament)
+                  .WithMany(t => t.Pools)
+                  .HasForeignKey(e => e.TournamentId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // PoolTeam
+        modelBuilder.Entity<PoolTeam>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Pool)
+                  .WithMany(p => p.PoolTeams)
+                  .HasForeignKey(e => e.PoolId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.TournamentTeam)
+                  .WithMany(tt => tt.PoolTeams)
+                  .HasForeignKey(e => e.TournamentTeamId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            // A team can only be in one pool per tournament
+            entity.HasIndex(e => new { e.PoolId, e.TournamentTeamId }).IsUnique();
+        });
+
+        // TournamentMatch
+        modelBuilder.Entity<TournamentMatch>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Label).HasMaxLength(50);
+            entity.HasOne(e => e.Tournament)
+                  .WithMany(t => t.TournamentMatches)
+                  .HasForeignKey(e => e.TournamentId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Match)
+                  .WithMany()
+                  .HasForeignKey(e => e.MatchId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .IsRequired(false);
+            entity.HasOne(e => e.Pool)
+                  .WithMany(p => p.Matches)
+                  .HasForeignKey(e => e.PoolId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
+            entity.HasOne(e => e.HomeTeam)
+                  .WithMany()
+                  .HasForeignKey(e => e.HomeTeamId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
+            entity.HasOne(e => e.AwayTeam)
+                  .WithMany()
+                  .HasForeignKey(e => e.AwayTeamId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
         });
     }
 }

@@ -1,0 +1,237 @@
+@* File: VolleyScore/Views/Tournaments/Report.cshtml *@
+@model VolleyScore.Models.Tournament
+@using VolleyScore.Models
+@{
+    ViewData["Title"] = Model.Name + " – Report";
+    var poolStandings = (Dictionary<int, List<TeamStanding>>)ViewBag.PoolStandings;
+    var overallStandings = (List<TeamStanding>)ViewBag.OverallStandings;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/tournament.css" asp-append-version="true" />
+}
+
+<div class="container py-4">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <a asp-action="Manage" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div>
+                <h2 class="mb-0"><i class="bi bi-bar-chart me-2"></i>@Model.Name – Report</h2>
+                <small class="text-muted">
+                    @Model.TournamentTeams.Count teams &nbsp;|&nbsp;
+                    @Model.SetsPerMatch sets/match &nbsp;|&nbsp;
+                    Status: <strong>@Model.Status</strong>
+                </small>
+            </div>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i>Print
+        </button>
+    </div>
+
+    <!-- Pool standings -->
+    @foreach (var pool in Model.Pools.OrderBy(p => p.SortOrder))
+    {
+        var standings = poolStandings.ContainsKey(pool.Id) ? poolStandings[pool.Id] : new List<TeamStanding>();
+        var poolMatches = Model.TournamentMatches
+            .Where(tm => tm.PoolId == pool.Id)
+            .OrderBy(tm => tm.SortOrder)
+            .ToList();
+
+        <div class="card mb-4">
+            <div class="card-header fw-bold fs-5">@pool.Name</div>
+            <div class="card-body p-0">
+
+                <!-- Standings table -->
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0 standings-table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>Team</th>
+                                <th title="Matches Played">MP</th>
+                                <th title="Matches Won">W</th>
+                                <th title="Matches Lost">L</th>
+                                <th title="Sets Won">SW</th>
+                                <th title="Sets Lost">SL</th>
+                                <th title="Points Scored">PS</th>
+                                <th title="Points Against">PA</th>
+                                <th title="Points Ratio">Ratio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < standings.Count; i++)
+                            {
+                                var s = standings[i];
+                                bool advances = i < 2; // top 2 advance
+                                <tr class="@(advances ? "table-success" : "")">
+                                    <td class="fw-bold">@(i + 1)</td>
+                                    <td>
+                                        @s.TeamName
+                                        @if (advances) { <span class="badge bg-success ms-1">Advances</span> }
+                                    </td>
+                                    <td>@s.MatchesPlayed</td>
+                                    <td class="fw-bold text-success">@s.MatchesWon</td>
+                                    <td class="text-danger">@s.MatchesLost</td>
+                                    <td class="fw-bold">@s.SetsWon</td>
+                                    <td>@s.SetsLost</td>
+                                    <td>@s.PointsScored</td>
+                                    <td>@s.PointsAllowed</td>
+                                    <td class="fw-bold">@s.PointsRatio.ToString("0.000")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pool matches results -->
+                @if (poolMatches.Any())
+                {
+                    <div class="px-3 py-2">
+                        <div class="small fw-semibold text-muted mb-1">Match Results</div>
+                        <div class="row g-2">
+                            @foreach (var tm in poolMatches)
+                            {
+                                var match = tm.Match;
+                                bool done = match?.Status == MatchStatus.Completed;
+                                <div class="col-sm-6 col-lg-4">
+                                    <div class="border rounded p-2 small @(done ? "border-success bg-light" : "")">
+                                        <div class="text-muted mb-1">@tm.Label</div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>@tm.HomeTeam?.Name</span>
+                                            @if (done && match != null)
+                                            {
+                                                int h = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId);
+                                                int a = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId);
+                                                <strong class="mx-2">@h – @a</strong>
+                                            }
+                                            else
+                                            {
+                                                <span class="mx-2 text-muted">vs</span>
+                                            }
+                                            <span>@tm.AwayTeam?.Name</span>
+                                        </div>
+                                        @if (done && match != null)
+                                        {
+                                            <div class="text-muted mt-1" style="font-size:.75rem">
+                                                @foreach (var set in match.Sets.OrderBy(s => s.SetNumber))
+                                                {
+                                                    <span>Set @set.SetNumber: @set.HomeScore–@set.AwayScore &nbsp;</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Overall standings -->
+    @if (overallStandings.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header fw-bold fs-5">Overall Standings</div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-0 standings-table">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Team</th>
+                            <th title="Matches Played">MP</th>
+                            <th title="Matches Won">W</th>
+                            <th title="Matches Lost">L</th>
+                            <th title="Sets Won">SW</th>
+                            <th title="Sets Lost">SL</th>
+                            <th title="Points Scored">PS</th>
+                            <th title="Points Against">PA</th>
+                            <th title="Points Ratio">Ratio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < overallStandings.Count; i++)
+                        {
+                            var s = overallStandings[i];
+                            string rowClass = i == 0 ? "table-warning" : i < 4 ? "table-success" : "";
+                            <tr class="@rowClass">
+                                <td class="fw-bold">
+                                    @(i + 1)
+                                    @if (i == 0) { <i class="bi bi-trophy-fill text-warning ms-1"></i> }
+                                </td>
+                                <td>@s.TeamName</td>
+                                <td>@s.MatchesPlayed</td>
+                                <td class="fw-bold text-success">@s.MatchesWon</td>
+                                <td class="text-danger">@s.MatchesLost</td>
+                                <td class="fw-bold">@s.SetsWon</td>
+                                <td>@s.SetsLost</td>
+                                <td>@s.PointsScored</td>
+                                <td>@s.PointsAllowed</td>
+                                <td class="fw-bold">@s.PointsRatio.ToString("0.000")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Knockout bracket -->
+    @{
+        var knockouts = Model.TournamentMatches
+            .Where(tm => tm.Phase != TournamentPhase.Pool)
+            .OrderBy(tm => tm.SortOrder)
+            .ToList();
+    }
+    @if (knockouts.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header fw-bold fs-5"><i class="bi bi-trophy me-2"></i>Knockout Bracket</div>
+            <div class="card-body">
+                <div class="bracket-grid">
+                    @foreach (var tm in knockouts)
+                    {
+                        var match = tm.Match;
+                        bool done = match?.Status == MatchStatus.Completed;
+                        string homeLabel = tm.HomeTeam?.Name ?? "TBD";
+                        string awayLabel = tm.AwayTeam?.Name ?? "TBD";
+                        int? homeSets = done && match != null
+                            ? match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId)
+                            : (int?)null;
+                        int? awaySets = done && match != null
+                            ? match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId)
+                            : (int?)null;
+
+                        <div class="bracket-match @(done ? "bracket-done" : "")">
+                            <div class="bracket-label">@tm.Label</div>
+                            <div class="bracket-team @(done && match != null && match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId) > match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId) ? "bracket-winner" : "")">
+                                <span>@homeLabel</span>
+                                @if (homeSets.HasValue) { <strong class="ms-auto">@homeSets</strong> }
+                            </div>
+                            <div class="bracket-team @(done && match != null && match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId) > match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId) ? "bracket-winner" : "")">
+                                <span>@awayLabel</span>
+                                @if (awaySets.HasValue) { <strong class="ms-auto">@awaySets</strong> }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+@section Scripts {
+<style>
+@@media print {
+    nav, .btn, .connection-status { display: none !important; }
+    .card { break-inside: avoid; }
+}
+</style>
+}

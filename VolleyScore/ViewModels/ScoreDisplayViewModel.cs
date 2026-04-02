@@ -16,4 +16,7 @@ public class ScoreDisplayViewModel
     public int TotalSets { get; set; }
     public string MatchReference { get; set; } = string.Empty;
     public bool HomeIsServing { get; set; } = true;
+
+    /// <summary>True = Home team on left side. Reflects operator court SwitchSides state.</summary>
+    public bool HomeTeamOnLeft { get; set; } = true;
 }

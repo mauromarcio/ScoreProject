@@ -1,0 +1,122 @@
+/* File: VolleyScore/wwwroot/css/tournament.css */
+/* Purpose: Styles for tournament management and report screens */
+
+/* ── Pool cards ─────────────────────────────────────────────────────────────── */
+.pool-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.pool-header {
+    background: #343a40;
+    color: #fff;
+    font-weight: 600;
+    padding: 6px 12px;
+    font-size: .9rem;
+}
+
+.sortable-pool {
+    min-height: 40px;
+    padding: 4px;
+}
+
+.pool-team-item {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin: 3px 0;
+    cursor: grab;
+    font-size: .875rem;
+    display: flex;
+    align-items: center;
+    transition: background .15s;
+}
+
+.pool-team-item:hover {
+    background: #f8f9fa;
+}
+
+.pool-team-item.ui-sortable-helper {
+    background: #e3f2fd;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    cursor: grabbing;
+}
+
+.pool-team-item.ui-sortable-placeholder {
+    background: #e9ecef;
+    border: 2px dashed #adb5bd;
+    visibility: visible !important;
+}
+
+/* ── Compact table buttons ───────────────────────────────────────────────────── */
+.btn-xs {
+    padding: 2px 7px;
+    font-size: .75rem;
+    border-radius: 4px;
+}
+
+/* ── Standings table ─────────────────────────────────────────────────────────── */
+.standings-table th,
+.standings-table td {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.standings-table td:nth-child(2),
+.standings-table th:nth-child(2) {
+    text-align: left;
+}
+
+/* ── Knockout bracket ────────────────────────────────────────────────────────── */
+.bracket-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.bracket-match {
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.bracket-match.bracket-done {
+    border-color: #198754;
+}
+
+.bracket-label {
+    background: #6c757d;
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    text-align: center;
+}
+
+.bracket-match.bracket-done .bracket-label {
+    background: #198754;
+}
+
+.bracket-team {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-size: .9rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+.bracket-team.bracket-winner {
+    background: #fff9c4;
+    font-weight: 700;
+}
+
+/* ── Print styles ────────────────────────────────────────────────────────────── */
+@media print {
+    .pool-card { break-inside: avoid; }
+    .bracket-grid { grid-template-columns: repeat(4, 1fr); }
+}

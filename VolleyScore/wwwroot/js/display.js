@@ -120,6 +120,14 @@
             applyUpdate(result);
         });
 
+        // Receive side-switch from operator court
+        connection.on('SidesSwitched', function (data) {
+            var row = document.getElementById('displayScoreRow');
+            if (row) {
+                row.style.flexDirection = data.homeTeamOnLeft ? 'row' : 'row-reverse';
+            }
+        });
+
         // Connection lifecycle
         connection.onreconnecting(function () {
             $connDot.removeClass('connected').addClass('disconnected');
