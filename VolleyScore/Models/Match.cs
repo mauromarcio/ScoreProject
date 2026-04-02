@@ -24,9 +24,13 @@ public class Match
     public int AwayTeamId { get; set; }
 
     [Required]
-    [Range(3, 5, ErrorMessage = "Sets must be 3 or 5")]
-    [Display(Name = "Best of Sets")]
+    [Range(1, 5, ErrorMessage = "Sets must be between 1 and 5")]
+    [Display(Name = "Number of Sets")]
     public int TotalSets { get; set; } = 3;
+
+    [Range(0, 24, ErrorMessage = "Initial score must be between 0 and 24")]
+    [Display(Name = "Initial Score (Fair Play)")]
+    public int InitialScore { get; set; } = 0;
 
     [Display(Name = "Current Set")]
     public int CurrentSetNumber { get; set; } = 1;
@@ -58,4 +62,7 @@ public class Match
     public int AwaySetsWon => Sets.Count(s => s.WinnerTeamId == AwayTeamId);
     [NotMapped]
     public int SetsToWin => (TotalSets / 2) + 1;
+    /// <summary>Maximum possible sets: odd TotalSets stays the same; even TotalSets adds one tiebreaker</summary>
+    [NotMapped]
+    public int MaxSets => TotalSets % 2 == 0 ? TotalSets + 1 : TotalSets;
 }

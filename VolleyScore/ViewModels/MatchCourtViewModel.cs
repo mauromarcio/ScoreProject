@@ -63,6 +63,7 @@ public class ScoreUpdateResult
     public int AwaySetsWon { get; set; }
     public int CurrentSetNumber { get; set; }
     public bool HomeIsServing { get; set; }
+    public bool HomeTeamOnLeft { get; set; }
     public bool SetCompleted { get; set; }
     public bool MatchCompleted { get; set; }
     public string? WinnerName { get; set; }

@@ -2,50 +2,73 @@
 // Purpose: Part 2 – Big-screen display logic.
 //   Connects to SignalR hub, listens for ScoreUpdated events from the operator,
 //   and animates the score numbers in real time without any page reload.
+//   Team sides mirror the court view: when the operator switches sides the display updates too.
 
 (function () {
     'use strict';
 
-    var matchId    = DISPLAY_DATA.matchId;
-    var totalSets  = DISPLAY_DATA.totalSets;
+    var matchId        = DISPLAY_DATA.matchId;
+    var totalSets      = DISPLAY_DATA.totalSets;
+    var homeTeamOnLeft = DISPLAY_DATA.homeTeamOnLeft; // tracked state
 
     // ── DOM element cache ─────────────────────────────────────────────────────
-    var $homeScore    = $('#displayHomeScore');
-    var $awayScore    = $('#displayAwayScore');
-    var $homeSets     = $('#displayHomeSets');
-    var $awaySets     = $('#displayAwaySets');
-    var $homeDots     = $('#displayHomeDots');
-    var $awayDots     = $('#displayAwayDots');
+    var $leftScore    = $('#displayLeftScore');
+    var $rightScore   = $('#displayRightScore');
+    var $leftSets     = $('#displayLeftSets');
+    var $rightSets    = $('#displayRightSets');
+    var $leftDots     = $('#displayLeftDots');
+    var $rightDots    = $('#displayRightDots');
     var $setNumber    = $('#displaySetNumber');
-    var $homeServing  = $('#displayHomeServing');
-    var $awayServing  = $('#displayAwayServing');
+    var $leftServing  = $('#displayLeftServing');
+    var $rightServing = $('#displayRightServing');
+    var $leftName     = $('#displayLeftTeamName');
+    var $rightName    = $('#displayRightTeamName');
     var $connDot      = $('#connDot');
     var $connText     = $('#connText');
 
     // ── Apply update from SignalR ──────────────────────────────────────────────
     function applyUpdate(result) {
-        // Animate score change
-        animateScore($homeScore, result.homeScore);
-        animateScore($awayScore, result.awayScore);
+        // Determine if the side assignment has changed
+        var htol = (result.homeTeamOnLeft !== undefined) ? result.homeTeamOnLeft : homeTeamOnLeft;
 
-        // Sets won
-        $homeSets.text(result.homeSetsWon);
-        $awaySets.text(result.awaySetsWon);
+        // If side assignment changed, swap team names
+        if (htol !== homeTeamOnLeft) {
+            homeTeamOnLeft = htol;
+            var leftName  = htol ? DISPLAY_DATA.homeTeamName : DISPLAY_DATA.awayTeamName;
+            var rightName = htol ? DISPLAY_DATA.awayTeamName : DISPLAY_DATA.homeTeamName;
+            $leftName.text(leftName);
+            $rightName.text(rightName);
+        }
+
+        // Map home/away data to left/right based on current side assignment
+        var leftScore  = htol ? result.homeScore  : result.awayScore;
+        var rightScore = htol ? result.awayScore  : result.homeScore;
+        var leftSets   = htol ? result.homeSetsWon  : result.awaySetsWon;
+        var rightSets  = htol ? result.awaySetsWon  : result.homeSetsWon;
+        var leftIsServing = htol ? result.homeIsServing : !result.homeIsServing;
+
+        // Animate score change
+        animateScore($leftScore, leftScore);
+        animateScore($rightScore, rightScore);
+
+        // Sets won counters
+        $leftSets.text(leftSets);
+        $rightSets.text(rightSets);
 
         // Set number
         $setNumber.text(result.currentSetNumber);
 
         // Update set dots
-        updateDots($homeDots, result.homeSetsWon);
-        updateDots($awayDots, result.awaySetsWon);
+        updateDots($leftDots, leftSets);
+        updateDots($rightDots, rightSets);
 
         // Serving indicator
-        if (result.homeIsServing) {
-            $homeServing.removeClass('hidden');
-            $awayServing.addClass('hidden');
+        if (leftIsServing) {
+            $leftServing.removeClass('hidden');
+            $rightServing.addClass('hidden');
         } else {
-            $homeServing.addClass('hidden');
-            $awayServing.removeClass('hidden');
+            $leftServing.addClass('hidden');
+            $rightServing.removeClass('hidden');
         }
 
         // Match complete – show winner
@@ -91,7 +114,7 @@
             })
             .html(
                 '<div style="text-align:center;animation:none">' +
-                '<div style="font-size:5rem;">🏆</div>' +
+                '<div style="font-size:5rem;">&#127942;</div>' +
                 '<div style="font-size:clamp(2.5rem,6vw,5rem);font-weight:900;color:#f5c542;margin-top:16px">' +
                 htmlEscape(winnerName) + '</div>' +
                 '<div style="font-size:2rem;color:#aaa;margin-top:8px">WINS THE MATCH</div>' +
@@ -123,7 +146,7 @@
         // Connection lifecycle
         connection.onreconnecting(function () {
             $connDot.removeClass('connected').addClass('disconnected');
-            $connText.text('Reconnecting…');
+            $connText.text('Reconnecting\u2026');
         });
 
         connection.onreconnected(function () {
@@ -158,7 +181,7 @@
 
     function startPollingFallback() {
         if (pollingInterval) return;
-        $connText.text('Polling…');
+        $connText.text('Polling\u2026');
         pollingInterval = setInterval(function () {
             $.getJSON('/Score/GetCurrentScore?matchId=' + matchId)
                 .done(function (result) {
@@ -170,11 +193,6 @@
 
     // ── Init ──────────────────────────────────────────────────────────────────
     $(document).ready(function () {
-        // Apply initial serving state from server-rendered data
-        if (DISPLAY_DATA.homeScore !== undefined) {
-            // Already rendered by server; just set up live updates
-        }
-
         initSignalR();
 
         // Keep screen awake (prevent display sleep) using Wake Lock API

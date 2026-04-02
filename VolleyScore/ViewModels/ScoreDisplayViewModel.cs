@@ -16,4 +16,6 @@ public class ScoreDisplayViewModel
     public int TotalSets { get; set; }
     public string MatchReference { get; set; } = string.Empty;
     public bool HomeIsServing { get; set; } = true;
+    /// <summary>True = Home team displays on the LEFT side of the big screen</summary>
+    public bool HomeTeamOnLeft { get; set; } = true;
 }

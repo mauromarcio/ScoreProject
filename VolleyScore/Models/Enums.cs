@@ -17,3 +17,21 @@ public enum CourtSide
     Left = 0,
     Right = 1
 }
+
+/// <summary>Tournament lifecycle status</summary>
+public enum TournamentStatus
+{
+    Setup = 0,       // Teams being added / pool order being arranged
+    PoolPlay = 1,    // Pool (round-robin) matches in progress
+    Playoffs = 2,    // Semi-finals / finals in progress
+    Completed = 3    // Tournament concluded
+}
+
+/// <summary>Which stage of the tournament a match belongs to</summary>
+public enum TournamentStage
+{
+    Pool = 0,
+    Semifinal = 1,
+    ThirdPlace = 2,
+    Final = 3
+}

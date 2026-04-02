@@ -1,0 +1,157 @@
+@* File: VolleyScore/Views/Tournaments/PoolPlay.cshtml *@
+@model VolleyScore.ViewModels.TournamentPoolViewModel
+@using VolleyScore.Models
+@{
+    ViewData["Title"] = Model.Tournament.Name + " – Pool Play";
+    var completedCount = Model.PoolMatches.Count(m => m.Match?.Status == MatchStatus.Completed);
+    var totalCount     = Model.PoolMatches.Count;
+}
+
+<div class="container py-4">
+    <div class="d-flex align-items-center mb-4">
+        <a asp-action="Details" asp-route-id="@Model.Tournament.Id" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="flex-fill">
+            <h2 class="mb-0">@Model.Tournament.Name – Pool Play</h2>
+            <p class="text-muted mb-0 small">@completedCount / @totalCount matches completed</p>
+        </div>
+        @if (Model.Tournament.Status == TournamentStatus.PoolPlay)
+        {
+            <form asp-action="GeneratePlayoffs" asp-route-id="@Model.Tournament.Id" method="post" class="ms-2">
+                <button type="submit" class="btn btn-warning btn-sm"
+                        onclick="return confirm('Generate semi-finals from current standings?')">
+                    <i class="bi bi-diagram-3 me-1"></i> Generate Semi-finals
+                </button>
+            </form>
+        }
+    </div>
+
+    @if (TempData["Warning"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show">
+            @TempData["Warning"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        <!-- Standings -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header"><strong>Standings</strong></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Team</th>
+                                <th class="text-center" title="Sets Won">SW</th>
+                                <th class="text-center" title="Points Made">PM</th>
+                                <th class="text-center" title="Points Against">PA</th>
+                                <th class="text-center" title="Points Ratio">Ratio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < Model.Standings.Count; i++)
+                            {
+                                var s = Model.Standings[i];
+                                var rowClass = i == 0 ? "table-success" : i == 1 ? "table-info" :
+                                               i == 2 ? "table-warning" : i == 3 ? "table-secondary" : "";
+                                <tr class="@rowClass">
+                                    <td class="fw-bold">@(i + 1)</td>
+                                    <td>@s.TeamName</td>
+                                    <td class="text-center fw-bold">@s.SetsWon</td>
+                                    <td class="text-center">@s.PointsMade</td>
+                                    <td class="text-center">@s.PointsAgainst</td>
+                                    <td class="text-center">
+                                        @(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" :
+                                          s.PointsRatio == double.MaxValue ? "∞" :
+                                          s.PointsRatio.ToString("F3"))
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer text-muted small">
+                    SW = Sets Won &nbsp;|&nbsp; PM = Points Made &nbsp;|&nbsp; PA = Points Against
+                </div>
+            </div>
+
+            @if (Model.Standings.Count >= 4)
+            {
+                <div class="card mt-3">
+                    <div class="card-header"><strong>Projected Semi-finals</strong></div>
+                    <div class="card-body">
+                        <p class="mb-1 small">
+                            <span class="badge bg-success me-1">SF1</span>
+                            <strong>@Model.Standings[0].TeamName</strong>
+                            <span class="text-muted">(1st)</span> vs
+                            <strong>@Model.Standings[3].TeamName</strong>
+                            <span class="text-muted">(4th)</span>
+                        </p>
+                        <p class="mb-0 small">
+                            <span class="badge bg-info me-1">SF2</span>
+                            <strong>@Model.Standings[1].TeamName</strong>
+                            <span class="text-muted">(2nd)</span> vs
+                            <strong>@Model.Standings[2].TeamName</strong>
+                            <span class="text-muted">(3rd)</span>
+                        </p>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Match List -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header"><strong>Pool Matches</strong></div>
+                <div class="list-group list-group-flush">
+                    @foreach (var tm in Model.PoolMatches)
+                    {
+                        var m = tm.Match;
+                        if (m == null) continue;
+                        var statusClass = m.Status == MatchStatus.Completed ? "success" :
+                                          m.Status == MatchStatus.InProgress ? "warning" : "secondary";
+                        var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                        var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                        <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
+                           class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="fw-semibold">@m.HomeTeam?.Name</span>
+                                    <span class="text-muted mx-2">vs</span>
+                                    <span class="fw-semibold">@m.AwayTeam?.Name</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    @if (m.Status == MatchStatus.Completed)
+                                    {
+                                        <span class="fw-bold">@homeSets – @awaySets</span>
+                                    }
+                                    <span class="badge bg-@statusClass">@m.Status</span>
+                                </div>
+                            </div>
+                            @if (m.Status == MatchStatus.Completed)
+                            {
+                                // Show per-set scores
+                                <div class="text-muted small mt-1">
+                                    @string.Join("  |  ", m.Sets.OrderBy(s => s.SetNumber)
+                                        .Select(s => $"Set {s.SetNumber}: {s.HomeScore}–{s.AwayScore}"))
+                                </div>
+                            }
+                        </a>
+                    }
+                    @if (!Model.PoolMatches.Any())
+                    {
+                        <div class="list-group-item text-muted text-center py-4">
+                            No pool matches yet.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>

@@ -28,18 +28,76 @@ builder.Services.AddSession(options =>
 var app = builder.Build();
 
 // ── Database Initialisation ───────────────────────────────────────────────────
-// Creates all tables if they do not exist (no migrations needed on first run)
+// Creates all tables if they do not exist (no migrations needed on first run).
+// Also applies safe ALTER TABLE additions for schema upgrades on existing databases.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<VolleyScoreContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
+        // Create any missing tables (new installs get everything; existing databases keep their data)
         db.Database.EnsureCreated();
+
+        // ── Safe schema upgrades for existing databases ───────────────────────
+        // Add InitialScore column to Matches if it doesn't exist yet
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (
+                SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'InitialScore'
+            )
+            BEGIN
+                ALTER TABLE Matches ADD InitialScore INT NOT NULL DEFAULT 0
+            END
+        ");
+
+        // Create Tournament tables if they don't exist (EnsureCreated only creates
+        // tables for a completely new database; existing DBs need explicit CREATE IF NOT EXISTS)
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Tournaments')
+            BEGIN
+                CREATE TABLE Tournaments (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    Name NVARCHAR(100) NOT NULL,
+                    Description NVARCHAR(300) NULL,
+                    PoolSetsPerMatch INT NOT NULL DEFAULT 2,
+                    PlayoffSetsPerMatch INT NOT NULL DEFAULT 3,
+                    InitialScore INT NOT NULL DEFAULT 0,
+                    Status INT NOT NULL DEFAULT 0,
+                    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+                )
+            END
+        ");
+
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'TournamentTeams')
+            BEGIN
+                CREATE TABLE TournamentTeams (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    TournamentId INT NOT NULL REFERENCES Tournaments(Id) ON DELETE CASCADE,
+                    TeamId INT NOT NULL REFERENCES Teams(Id),
+                    SeedOrder INT NOT NULL DEFAULT 1,
+                    CONSTRAINT UQ_TournamentTeam UNIQUE (TournamentId, TeamId)
+                )
+            END
+        ");
+
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'TournamentMatches')
+            BEGIN
+                CREATE TABLE TournamentMatches (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    TournamentId INT NOT NULL REFERENCES Tournaments(Id) ON DELETE CASCADE,
+                    MatchId INT NOT NULL REFERENCES Matches(Id),
+                    Stage INT NOT NULL DEFAULT 0,
+                    MatchNumber INT NOT NULL DEFAULT 1
+                )
+            END
+        ");
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred creating the database.");
+        logger.LogError(ex, "An error occurred initialising the database.");
     }
 }
 

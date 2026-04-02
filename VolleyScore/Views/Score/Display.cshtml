@@ -1,10 +1,21 @@
 @* File: VolleyScore/Views/Score/Display.cshtml *@
 @* Purpose: Part 2 – Big-screen score display. Opens on a separate monitor/computer.
-            Connects to SignalR and updates in real time when operator changes score. *@
+            Connects to SignalR and updates in real time when operator changes score.
+            Team sides mirror the court view – when sides switch on the court the display updates too. *@
 @model VolleyScore.ViewModels.ScoreDisplayViewModel
 @{
     ViewData["Title"] = Model.MatchReference + " – Display";
     Layout = "_LayoutDisplay";
+
+    // Determine initial left/right based on HomeTeamOnLeft flag
+    var leftTeamName  = Model.HomeTeamOnLeft ? Model.HomeTeamName  : Model.AwayTeamName;
+    var rightTeamName = Model.HomeTeamOnLeft ? Model.AwayTeamName  : Model.HomeTeamName;
+    var leftScore     = Model.HomeTeamOnLeft ? Model.HomeScore     : Model.AwayScore;
+    var rightScore    = Model.HomeTeamOnLeft ? Model.AwayScore     : Model.HomeScore;
+    var leftSetsWon   = Model.HomeTeamOnLeft ? Model.HomeSetsWon   : Model.AwaySetsWon;
+    var rightSetsWon  = Model.HomeTeamOnLeft ? Model.AwaySetsWon   : Model.HomeSetsWon;
+    var leftIsServing = Model.HomeTeamOnLeft ? Model.HomeIsServing : !Model.HomeIsServing;
+    int setsToShow    = (Model.TotalSets / 2) + 1;
 }
 
 @section Styles {
@@ -147,8 +158,8 @@
         color: #ccc;
     }
 
-    .display-sets-score .sets-home,
-    .display-sets-score .sets-away {
+    .display-sets-score .sets-left,
+    .display-sets-score .sets-right {
         color: #f5c542;
     }
 
@@ -212,19 +223,19 @@
     <!-- Main score area -->
     <div class="display-score-row">
 
-        <!-- Left team (Home) -->
-        <div class="display-team" id="displayHomeTeam">
-            <div class="display-team-name" id="displayHomeTeamName">@Model.HomeTeamName</div>
-            <div class="display-set-dots" id="displayHomeDots">
-                @for (int i = 0; i < (Model.TotalSets / 2 + 1); i++)
+        <!-- Left team -->
+        <div class="display-team" id="displayLeftTeam">
+            <div class="display-team-name" id="displayLeftTeamName">@leftTeamName</div>
+            <div class="display-set-dots" id="displayLeftDots">
+                @for (int i = 0; i < setsToShow; i++)
                 {
-                    <div class="display-set-dot @(i < Model.HomeSetsWon ? "won" : "")"
+                    <div class="display-set-dot @(i < leftSetsWon ? "won" : "")"
                          data-index="@i"></div>
                 }
             </div>
-            <div class="display-score-number" id="displayHomeScore">@Model.HomeScore</div>
-            <div class="display-serving @(Model.HomeIsServing ? "" : "hidden")"
-                 id="displayHomeServing">SERVING</div>
+            <div class="display-score-number" id="displayLeftScore">@leftScore</div>
+            <div class="display-serving @(leftIsServing ? "" : "hidden")"
+                 id="displayLeftServing">SERVING</div>
         </div>
 
         <!-- Divider -->
@@ -232,18 +243,18 @@
             <div class="display-colon">:</div>
         </div>
 
-        <!-- Right team (Away) -->
-        <div class="display-team" id="displayAwayTeam">
-            <div class="display-serving @(!Model.HomeIsServing ? "" : "hidden")" id="displayAwayServing">SERVING</div>
-            <div class="display-score-number" id="displayAwayScore">@Model.AwayScore</div>
-            <div class="display-set-dots" id="displayAwayDots">
-                @for (int i = 0; i < (Model.TotalSets / 2 + 1); i++)
+        <!-- Right team -->
+        <div class="display-team" id="displayRightTeam">
+            <div class="display-serving @(!leftIsServing ? "" : "hidden")" id="displayRightServing">SERVING</div>
+            <div class="display-score-number" id="displayRightScore">@rightScore</div>
+            <div class="display-set-dots" id="displayRightDots">
+                @for (int i = 0; i < setsToShow; i++)
                 {
-                    <div class="display-set-dot @(i < Model.AwaySetsWon ? "won" : "")"
+                    <div class="display-set-dot @(i < rightSetsWon ? "won" : "")"
                          data-index="@i"></div>
                 }
             </div>
-            <div class="display-team-name" id="displayAwayTeamName">@Model.AwayTeamName</div>
+            <div class="display-team-name" id="displayRightTeamName">@rightTeamName</div>
         </div>
     </div>
 
@@ -251,9 +262,9 @@
     <div class="display-sets-row">
         <div class="display-set-label">SETS</div>
         <div class="display-sets-score">
-            <span class="sets-home" id="displayHomeSets">@Model.HomeSetsWon</span>
+            <span class="sets-left" id="displayLeftSets">@leftSetsWon</span>
             <span style="color:#444"> – </span>
-            <span class="sets-away" id="displayAwaySets">@Model.AwaySetsWon</span>
+            <span class="sets-right" id="displayRightSets">@rightSetsWon</span>
         </div>
     </div>
 
@@ -278,7 +289,8 @@
         awaySetsWon: @Model.AwaySetsWon,
         currentSetNumber: @Model.CurrentSetNumber,
         totalSets: @Model.TotalSets,
-        homeIsServing: @Model.HomeIsServing.ToString().ToLower()
+        homeIsServing: @Model.HomeIsServing.ToString().ToLower(),
+        homeTeamOnLeft: @Model.HomeTeamOnLeft.ToString().ToLower()
     };
 </script>
 <script src="~/js/display.js" asp-append-version="true"></script>

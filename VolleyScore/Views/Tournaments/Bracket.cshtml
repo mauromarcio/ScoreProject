@@ -1,0 +1,331 @@
+@* File: VolleyScore/Views/Tournaments/Bracket.cshtml *@
+@model VolleyScore.ViewModels.TournamentBracketViewModel
+@using VolleyScore.Models
+@{
+    ViewData["Title"] = Model.Tournament.Name + " – Bracket";
+
+    // Helper to get set result string for a match
+    string SetResultOf(Match? m)
+    {
+        if (m == null) return "";
+        var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+        var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+        return $"{homeSets}–{awaySets}";
+    }
+
+    int? WinnerOf(Match? m)
+    {
+        if (m?.Status != MatchStatus.Completed) return null;
+        var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+        return homeSets >= m.SetsToWin ? m.HomeTeamId : m.AwayTeamId;
+    }
+}
+
+@section Styles {
+<style>
+    .bracket-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #888;
+        margin-bottom: 4px;
+    }
+    .bracket-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 10px 14px;
+        background: #fff;
+        margin-bottom: 16px;
+    }
+    .bracket-card .team-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 2px 0;
+    }
+    .bracket-placeholder {
+        border: 1px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 16px;
+        color: #aaa;
+    }
+    .badge-xs { font-size: 0.65rem; }
+    .winner-name { color: #198754; font-weight: 700; }
+</style>
+}
+
+<div class="container py-4">
+    <div class="d-flex align-items-center mb-4">
+        <a asp-action="Details" asp-route-id="@Model.Tournament.Id" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="flex-fill">
+            <h2 class="mb-0">@Model.Tournament.Name – Bracket</h2>
+        </div>
+        <a asp-action="PoolPlay" asp-route-id="@Model.Tournament.Id" class="btn btn-outline-primary btn-sm ms-2">
+            <i class="bi bi-table me-1"></i> Pool Standings
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Warning"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show">
+            @TempData["Warning"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Pool Standings Summary -->
+    <div class="card mb-4">
+        <div class="card-header"><strong>Pool Standings</strong></div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Team</th>
+                        <th class="text-center">Sets Won</th>
+                        <th class="text-center">Pts Made</th>
+                        <th class="text-center">Pts Against</th>
+                        <th class="text-center">Ratio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Model.Standings.Count; i++)
+                    {
+                        var s = Model.Standings[i];
+                        var rowClass = i == 0 ? "table-success" : i == 1 ? "table-info" :
+                                       i == 2 ? "table-warning" : i == 3 ? "table-secondary" : "";
+                        <tr class="@rowClass">
+                            <td class="fw-bold">
+                                @(i + 1)
+                                @if (i < 4) { <i class="bi bi-arrow-right-circle-fill text-muted ms-1" title="Advances to playoffs"></i> }
+                            </td>
+                            <td>@s.TeamName</td>
+                            <td class="text-center fw-bold">@s.SetsWon</td>
+                            <td class="text-center">@s.PointsMade</td>
+                            <td class="text-center">@s.PointsAgainst</td>
+                            <td class="text-center">
+                                @(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" :
+                                  s.PointsRatio == double.MaxValue ? "∞" :
+                                  s.PointsRatio.ToString("F3"))
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Playoff Bracket -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Playoff Bracket</strong>
+            @if (!Model.Semifinals.Any())
+            {
+                <form asp-action="GeneratePlayoffs" asp-route-id="@Model.Tournament.Id" method="post">
+                    <button type="submit" class="btn btn-warning btn-sm">
+                        <i class="bi bi-diagram-3 me-1"></i> Generate Semi-finals
+                    </button>
+                </form>
+            }
+            else if (Model.FinalMatch == null)
+            {
+                <form asp-action="GenerateFinals" asp-route-id="@Model.Tournament.Id" method="post">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-trophy me-1"></i> Generate Final &amp; 3rd Place
+                    </button>
+                </form>
+            }
+        </div>
+        <div class="card-body">
+            @if (!Model.Semifinals.Any())
+            {
+                <p class="text-muted text-center mb-0">Semi-finals not yet generated.</p>
+            }
+            else
+            {
+                <div class="row g-3">
+
+                    <!-- Semi-finals -->
+                    <div class="col-md-4">
+                        <h6 class="text-muted text-uppercase fw-bold mb-3">Semi-finals</h6>
+                        @foreach (var sf in Model.Semifinals)
+                        {
+                            var sfM = sf.Match;
+                            var sfWinner = WinnerOf(sfM);
+                            var sfResult = SetResultOf(sfM);
+                            <div class="bracket-label">SF @sf.MatchNumber</div>
+                            <div class="bracket-card">
+                                @if (sfM != null)
+                                {
+                                    <a asp-controller="Matches" asp-action="Court" asp-route-id="@sfM.Id"
+                                       class="text-decoration-none text-reset">
+                                        <div class="team-row">
+                                            <span class="@(sfWinner == sfM.HomeTeamId ? "winner-name" : "")">@sfM.HomeTeam?.Name</span>
+                                            @if (sfM.Status == MatchStatus.Completed)
+                                            {
+                                                <span class="badge @(sfWinner == sfM.HomeTeamId ? "bg-success" : "bg-secondary")">
+                                                    @sfM.Sets.Count(s => s.WinnerTeamId == sfM.HomeTeamId)
+                                                </span>
+                                            }
+                                            else { <span class="badge bg-secondary">–</span> }
+                                        </div>
+                                        <div class="team-row">
+                                            <span class="@(sfWinner == sfM.AwayTeamId ? "winner-name" : "")">@sfM.AwayTeam?.Name</span>
+                                            @if (sfM.Status == MatchStatus.Completed)
+                                            {
+                                                <span class="badge @(sfWinner == sfM.AwayTeamId ? "bg-success" : "bg-secondary")">
+                                                    @sfM.Sets.Count(s => s.WinnerTeamId == sfM.AwayTeamId)
+                                                </span>
+                                            }
+                                            else { <span class="badge bg-secondary">–</span> }
+                                        </div>
+                                    </a>
+                                    <div class="text-end mt-1">
+                                        <span class="badge badge-xs @(sfM.Status == MatchStatus.Completed ? "bg-dark" : sfM.Status == MatchStatus.InProgress ? "bg-success" : "bg-secondary")">
+                                            @sfM.Status
+                                        </span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">TBD</span>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Final + 3rd Place -->
+                    <div class="col-md-4">
+                        <h6 class="text-muted text-uppercase fw-bold mb-3">Final</h6>
+                        @if (Model.FinalMatch?.Match != null)
+                        {
+                            var fm = Model.FinalMatch.Match;
+                            var fWinner = WinnerOf(fm);
+                            <div class="bracket-label">FINAL</div>
+                            <div class="bracket-card">
+                                <a asp-controller="Matches" asp-action="Court" asp-route-id="@fm.Id"
+                                   class="text-decoration-none text-reset">
+                                    <div class="team-row">
+                                        <span class="@(fWinner == fm.HomeTeamId ? "winner-name" : "")">@fm.HomeTeam?.Name</span>
+                                        @if (fm.Status == MatchStatus.Completed)
+                                        { <span class="badge @(fWinner == fm.HomeTeamId ? "bg-success" : "bg-secondary")">@fm.Sets.Count(s => s.WinnerTeamId == fm.HomeTeamId)</span> }
+                                        else { <span class="badge bg-secondary">–</span> }
+                                    </div>
+                                    <div class="team-row">
+                                        <span class="@(fWinner == fm.AwayTeamId ? "winner-name" : "")">@fm.AwayTeam?.Name</span>
+                                        @if (fm.Status == MatchStatus.Completed)
+                                        { <span class="badge @(fWinner == fm.AwayTeamId ? "bg-success" : "bg-secondary")">@fm.Sets.Count(s => s.WinnerTeamId == fm.AwayTeamId)</span> }
+                                        else { <span class="badge bg-secondary">–</span> }
+                                    </div>
+                                </a>
+                                <div class="text-end mt-1">
+                                    <span class="badge badge-xs @(fm.Status == MatchStatus.Completed ? "bg-dark" : fm.Status == MatchStatus.InProgress ? "bg-success" : "bg-secondary")">
+                                        @fm.Status
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="bracket-placeholder">Pending semi-final results</div>
+                        }
+
+                        <h6 class="text-muted text-uppercase fw-bold mt-3 mb-3">3rd Place</h6>
+                        @if (Model.ThirdPlaceMatch?.Match != null)
+                        {
+                            var t3m = Model.ThirdPlaceMatch.Match;
+                            var t3Winner = WinnerOf(t3m);
+                            <div class="bracket-label">3RD PLACE</div>
+                            <div class="bracket-card">
+                                <a asp-controller="Matches" asp-action="Court" asp-route-id="@t3m.Id"
+                                   class="text-decoration-none text-reset">
+                                    <div class="team-row">
+                                        <span class="@(t3Winner == t3m.HomeTeamId ? "winner-name" : "")">@t3m.HomeTeam?.Name</span>
+                                        @if (t3m.Status == MatchStatus.Completed)
+                                        { <span class="badge @(t3Winner == t3m.HomeTeamId ? "bg-success" : "bg-secondary")">@t3m.Sets.Count(s => s.WinnerTeamId == t3m.HomeTeamId)</span> }
+                                        else { <span class="badge bg-secondary">–</span> }
+                                    </div>
+                                    <div class="team-row">
+                                        <span class="@(t3Winner == t3m.AwayTeamId ? "winner-name" : "")">@t3m.AwayTeam?.Name</span>
+                                        @if (t3m.Status == MatchStatus.Completed)
+                                        { <span class="badge @(t3Winner == t3m.AwayTeamId ? "bg-success" : "bg-secondary")">@t3m.Sets.Count(s => s.WinnerTeamId == t3m.AwayTeamId)</span> }
+                                        else { <span class="badge bg-secondary">–</span> }
+                                    </div>
+                                </a>
+                                <div class="text-end mt-1">
+                                    <span class="badge badge-xs @(t3m.Status == MatchStatus.Completed ? "bg-dark" : t3m.Status == MatchStatus.InProgress ? "bg-success" : "bg-secondary")">
+                                        @t3m.Status
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="bracket-placeholder">Pending semi-final results</div>
+                        }
+                    </div>
+
+                    <!-- Results summary -->
+                    @{
+                        var finalDone = Model.FinalMatch?.Match?.Status == MatchStatus.Completed;
+                        var thirdDone = Model.ThirdPlaceMatch?.Match?.Status == MatchStatus.Completed;
+                    }
+                    @if (finalDone || thirdDone)
+                    {
+                        <div class="col-md-4">
+                            <h6 class="text-muted text-uppercase fw-bold mb-3">Results</h6>
+                            @if (finalDone && Model.FinalMatch?.Match != null)
+                            {
+                                var fm2  = Model.FinalMatch.Match;
+                                var fhS  = fm2.Sets.Count(s => s.WinnerTeamId == fm2.HomeTeamId);
+                                var faS  = fm2.Sets.Count(s => s.WinnerTeamId == fm2.AwayTeamId);
+                                var fWin = fhS >= fm2.SetsToWin ? fm2.HomeTeam : fm2.AwayTeam;
+                                <div class="card border-warning mb-3">
+                                    <div class="card-body text-center py-3">
+                                        <div class="text-warning fw-bold small">CHAMPION</div>
+                                        <div class="fs-4 fw-bold mt-1">@fWin?.Name</div>
+                                        <div class="text-muted small">@fhS – @faS sets</div>
+                                    </div>
+                                </div>
+                            }
+                            @if (thirdDone && Model.ThirdPlaceMatch?.Match != null)
+                            {
+                                var t3m2 = Model.ThirdPlaceMatch.Match;
+                                var t3hS = t3m2.Sets.Count(s => s.WinnerTeamId == t3m2.HomeTeamId);
+                                var t3aS = t3m2.Sets.Count(s => s.WinnerTeamId == t3m2.AwayTeamId);
+                                var t3W  = t3hS >= t3m2.SetsToWin ? t3m2.HomeTeam : t3m2.AwayTeam;
+                                <div class="card border-secondary">
+                                    <div class="card-body text-center py-3">
+                                        <div class="text-secondary fw-bold small">3RD PLACE</div>
+                                        <div class="fs-5 fw-bold mt-1">@t3W?.Name</div>
+                                        <div class="text-muted small">@t3hS – @t3aS sets</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                </div>
+            }
+        </div>
+    </div>
+</div>

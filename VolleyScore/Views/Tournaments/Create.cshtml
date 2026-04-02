@@ -1,0 +1,113 @@
+@* File: VolleyScore/Views/Tournaments/Create.cshtml *@
+@model VolleyScore.Models.Tournament
+@{
+    ViewData["Title"] = "New Tournament";
+    var allTeams = ViewBag.AllTeams as List<VolleyScore.Models.Team> ?? new();
+}
+
+<div class="container py-4" style="max-width:680px">
+    <div class="d-flex align-items-center mb-4">
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h2 class="mb-0">New Tournament</h2>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form asp-action="Create" method="post">
+                <div asp-validation-summary="All" class="alert alert-danger" style="display:none" id="valSummary"></div>
+
+                <div class="mb-3">
+                    <label asp-for="Name" class="form-label fw-semibold">Tournament Name</label>
+                    <input asp-for="Name" class="form-control" placeholder="e.g. Summer Open 2025" autofocus />
+                    <span asp-validation-for="Name" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label fw-semibold">Description <span class="text-muted fw-normal">(optional)</span></label>
+                    <textarea asp-for="Description" class="form-control" rows="2"
+                              placeholder="Location, date, notes…"></textarea>
+                    <span asp-validation-for="Description" class="text-danger small"></span>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-4">
+                        <label asp-for="PoolSetsPerMatch" class="form-label fw-semibold">Sets / Pool Match</label>
+                        <select asp-for="PoolSetsPerMatch" class="form-select">
+                            <option value="1">1 Set</option>
+                            <option value="2" selected>2 Sets</option>
+                            <option value="3">Best of 3</option>
+                            <option value="5">Best of 5</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-4">
+                        <label asp-for="PlayoffSetsPerMatch" class="form-label fw-semibold">Sets / Playoff Match</label>
+                        <select asp-for="PlayoffSetsPerMatch" class="form-select">
+                            <option value="1">1 Set</option>
+                            <option value="2">2 Sets</option>
+                            <option value="3" selected>Best of 3</option>
+                            <option value="5">Best of 5</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-4">
+                        <label asp-for="InitialScore" class="form-label fw-semibold">Initial Score</label>
+                        <input asp-for="InitialScore" type="number" class="form-control" min="0" max="24" value="0" />
+                        <div class="form-text">0 = standard</div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">
+                        Teams
+                        <span class="badge bg-secondary ms-1" id="teamCountBadge">0 selected</span>
+                        <span class="text-muted fw-normal small ms-2">(2–50)</span>
+                    </label>
+                    <div class="border rounded p-3" style="max-height:320px;overflow-y:auto">
+                        @foreach (var team in allTeams)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input team-check" type="checkbox"
+                                       name="selectedTeamIds" value="@team.Id"
+                                       id="team_@team.Id" />
+                                <label class="form-check-label" for="team_@team.Id">
+                                    @team.Name
+                                    @if (!string.IsNullOrEmpty(team.Description))
+                                    {
+                                        <span class="text-muted small"> – @team.Description</span>
+                                    }
+                                </label>
+                            </div>
+                        }
+                        @if (!allTeams.Any())
+                        {
+                            <p class="text-muted mb-0 small">No teams available. <a asp-controller="Teams" asp-action="Create">Create teams</a> first.</p>
+                        }
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i> Create Tournament
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        var checks = document.querySelectorAll('.team-check');
+        var badge  = document.getElementById('teamCountBadge');
+        function updateCount() {
+            var n = document.querySelectorAll('.team-check:checked').length;
+            badge.textContent = n + ' selected';
+            badge.className = 'badge ms-1 ' + (n < 2 || n > 50 ? 'bg-danger' : 'bg-success');
+        }
+        checks.forEach(function(c) { c.addEventListener('change', updateCount); });
+        updateCount();
+    </script>
+}

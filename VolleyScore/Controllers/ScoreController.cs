@@ -51,7 +51,8 @@ public class ScoreController : Controller
             awaySetsWon = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId),
             currentSetNumber = match.CurrentSetNumber,
             homeIsServing = set.HomeIsServing,
-            matchCompleted = match.Status == MatchStatus.Completed
+            matchCompleted = match.Status == MatchStatus.Completed,
+            homeTeamOnLeft = match.HomeTeamOnLeft
         });
     }
 
@@ -81,7 +82,8 @@ public class ScoreController : Controller
             CurrentSetNumber = match.CurrentSetNumber,
             TotalSets = match.TotalSets,
             MatchReference = match.MatchReference,
-            HomeIsServing = currentSet.HomeIsServing
+            HomeIsServing = currentSet.HomeIsServing,
+            HomeTeamOnLeft = match.HomeTeamOnLeft
         };
 
         return View(vm);
@@ -130,12 +132,13 @@ public class ScoreController : Controller
         if (errorResult != null) return errorResult;
 
         bool isHome = req.Team == "Home";
+        int minScore = match!.InitialScore;
 
-        // Apply delta
+        // Apply delta (never go below InitialScore)
         if (isHome)
-            currentSet!.HomeScore = Math.Max(0, currentSet.HomeScore + delta);
+            currentSet!.HomeScore = Math.Max(minScore, currentSet.HomeScore + delta);
         else
-            currentSet!.AwayScore = Math.Max(0, currentSet.AwayScore + delta);
+            currentSet!.AwayScore = Math.Max(minScore, currentSet.AwayScore + delta);
 
         bool setCompleted = false;
         bool matchCompleted = false;
@@ -169,7 +172,8 @@ public class ScoreController : Controller
             }
 
             // ── Check for set win ─────────────────────────────────────────────
-            int winThreshold = (match!.CurrentSetNumber == match.TotalSets) ? 15 : 25;
+            // Final/deciding set plays to 15; all others play to 25
+            int winThreshold = (match!.CurrentSetNumber >= match.MaxSets) ? 15 : 25;
             int homeS = currentSet.HomeScore;
             int awayS = currentSet.AwayScore;
 
@@ -185,7 +189,7 @@ public class ScoreController : Controller
 
                 int homeSets = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId);
                 int awaySets = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId);
-                int setsToWin = (match.TotalSets / 2) + 1;
+                int setsToWin = match.SetsToWin;
 
                 if (homeSets >= setsToWin || awaySets >= setsToWin)
                 {
@@ -200,13 +204,15 @@ public class ScoreController : Controller
                     match.CurrentSetNumber = nextSetNumber;
 
                     // Server in next set: team that lost previous set serves first
-                    bool nextHomeServes = homeWinsSet ? false : true;
+                    bool nextHomeServes = !homeWinsSet;
 
                     var nextSet = new GameSet
                     {
                         MatchId = match.Id,
                         SetNumber = nextSetNumber,
-                        HomeIsServing = nextHomeServes
+                        HomeIsServing = nextHomeServes,
+                        HomeScore = match.InitialScore,
+                        AwayScore = match.InitialScore
                     };
                     _context.GameSets.Add(nextSet);
                     match.ServingTeamId = nextHomeServes ? match.HomeTeamId : match.AwayTeamId;
@@ -363,6 +369,7 @@ public class ScoreController : Controller
             AwaySetsWon = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId),
             CurrentSetNumber = match.CurrentSetNumber,
             HomeIsServing = set.HomeIsServing,
+            HomeTeamOnLeft = match.HomeTeamOnLeft,
             SetCompleted = setCompleted,
             MatchCompleted = matchCompleted,
             HomeCourtPositions = ToPositionDtos(homePositions),

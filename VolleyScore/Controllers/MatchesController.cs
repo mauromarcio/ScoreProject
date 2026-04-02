@@ -4,8 +4,10 @@
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using VolleyScore.Data;
+using VolleyScore.Hubs;
 using VolleyScore.Models;
 using VolleyScore.ViewModels;
 
@@ -14,10 +16,12 @@ namespace VolleyScore.Controllers;
 public class MatchesController : Controller
 {
     private readonly VolleyScoreContext _context;
+    private readonly IHubContext<ScoreHub> _hubContext;
 
-    public MatchesController(VolleyScoreContext context)
+    public MatchesController(VolleyScoreContext context, IHubContext<ScoreHub> hubContext)
     {
         _context = context;
+        _hubContext = hubContext;
     }
 
     // GET: Matches
@@ -65,12 +69,14 @@ public class MatchesController : Controller
         _context.Matches.Add(match);
         await _context.SaveChangesAsync();
 
-        // Create the first set record
+        // Create the first set record with the configured initial score
         var firstSet = new GameSet
         {
             MatchId = match.Id,
             SetNumber = 1,
-            HomeIsServing = true
+            HomeIsServing = true,
+            HomeScore = match.InitialScore,
+            AwayScore = match.InitialScore
         };
         _context.GameSets.Add(firstSet);
         await _context.SaveChangesAsync();
@@ -143,15 +149,41 @@ public class MatchesController : Controller
         return Ok(new { success = true });
     }
 
-    // POST: Matches/SwitchSides/5 - Flip home/away court sides
+    // POST: Matches/SwitchSides/5 - Flip home/away court sides and broadcast to display screen
     [HttpPost]
     public async Task<IActionResult> SwitchSides(int id)
     {
-        var match = await _context.Matches.FindAsync(id);
+        var match = await _context.Matches
+            .Include(m => m.HomeTeam)
+            .Include(m => m.AwayTeam)
+            .Include(m => m.Sets)
+            .FirstOrDefaultAsync(m => m.Id == id);
         if (match == null) return NotFound();
 
         match.HomeTeamOnLeft = !match.HomeTeamOnLeft;
         await _context.SaveChangesAsync();
+
+        // Broadcast side switch to display screen via SignalR
+        var currentSet = match.Sets.FirstOrDefault(s => s.SetNumber == match.CurrentSetNumber)
+                        ?? match.Sets.OrderBy(s => s.SetNumber).LastOrDefault();
+
+        if (currentSet != null)
+        {
+            var broadcast = new ScoreUpdateResult
+            {
+                Success = true,
+                HomeScore = currentSet.HomeScore,
+                AwayScore = currentSet.AwayScore,
+                HomeSetsWon = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId),
+                AwaySetsWon = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId),
+                CurrentSetNumber = match.CurrentSetNumber,
+                HomeIsServing = currentSet.HomeIsServing,
+                HomeTeamOnLeft = match.HomeTeamOnLeft,
+                SetCompleted = false,
+                MatchCompleted = false
+            };
+            await _hubContext.Clients.Group($"match-{id}").SendAsync("ScoreUpdated", broadcast);
+        }
 
         return Ok(new { success = true, homeOnLeft = match.HomeTeamOnLeft });
     }
