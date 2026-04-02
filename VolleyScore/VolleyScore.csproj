@@ -1,0 +1,24 @@
+<!-- File: VolleyScore/VolleyScore.csproj -->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>VolleyScore</RootNamespace>
+    <AssemblyName>VolleyScore</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- EF Core SQL Server provider -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.3" />
+    <!-- EF Core design-time tools (migrations, scaffolding) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- SignalR server is included in Microsoft.AspNetCore.App (no extra package needed).
+         The JavaScript client is loaded via CDN in _Layout / _LayoutDisplay. -->
+  </ItemGroup>
+
+</Project>

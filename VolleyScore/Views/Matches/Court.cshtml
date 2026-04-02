@@ -1,0 +1,317 @@
+@* File: VolleyScore/Views/Matches/Court.cshtml *@
+@* Purpose: Main operational court view. Drag-drop player setup, real-time scoring, rotation control. *@
+@model VolleyScore.ViewModels.MatchCourtViewModel
+@{
+    ViewData["Title"] = Model.Match.MatchReference + " – Court";
+    Layout = "_Layout";
+
+    // Determine which team visually appears on each side based on HomeTeamOnLeft flag
+    var leftTeam  = Model.HomeTeamOnLeft ? Model.HomeTeam  : Model.AwayTeam;
+    var rightTeam = Model.HomeTeamOnLeft ? Model.AwayTeam  : Model.HomeTeam;
+    var leftPlayers  = Model.HomeTeamOnLeft ? Model.HomePlayers  : Model.AwayPlayers;
+    var rightPlayers = Model.HomeTeamOnLeft ? Model.AwayPlayers  : Model.HomePlayers;
+    var leftPositions  = Model.HomeTeamOnLeft ? Model.HomeCourtPositions : Model.AwayCourtPositions;
+    var rightPositions = Model.HomeTeamOnLeft ? Model.AwayCourtPositions : Model.HomeCourtPositions;
+    var leftSide  = Model.HomeTeamOnLeft ? "Home" : "Away";
+    var rightSide = Model.HomeTeamOnLeft ? "Away" : "Home";
+    var leftSetsWon  = Model.HomeTeamOnLeft ? Model.HomeSetsWon  : Model.AwaySetsWon;
+    var rightSetsWon = Model.HomeTeamOnLeft ? Model.AwaySetsWon : Model.HomeSetsWon;
+    bool leftIsServing  = Model.HomeTeamOnLeft ? Model.HomeIsServing : !Model.HomeIsServing;
+    bool rightIsServing = !leftIsServing;
+    int leftScore  = Model.HomeTeamOnLeft ? Model.CurrentSet.HomeScore  : Model.CurrentSet.AwayScore;
+    int rightScore = Model.HomeTeamOnLeft ? Model.CurrentSet.AwayScore : Model.CurrentSet.HomeScore;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/court.css" asp-append-version="true" />
+}
+
+<!-- Pass model data to JavaScript (all strings JSON-serialized to be injection-safe) -->
+<script>
+    var COURT_DATA = {
+        matchId: @Model.Match.Id,
+        setNumber: @Model.CurrentSet.SetNumber,
+        matchStatus: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Match.Status.ToString())),
+        homeTeamId: @Model.HomeTeam.Id,
+        awayTeamId: @Model.AwayTeam.Id,
+        homeTeamName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.HomeTeam.Name)),
+        awayTeamName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AwayTeam.Name)),
+        homeTeamOnLeft: @Model.HomeTeamOnLeft.ToString().ToLower(),
+        homeIsServing: @Model.HomeIsServing.ToString().ToLower(),
+        homeSetsWon: @Model.HomeSetsWon,
+        awaySetsWon: @Model.AwaySetsWon,
+        totalSets: @Model.TotalSets,
+        homeScore: @Model.CurrentSet.HomeScore,
+        awayScore: @Model.CurrentSet.AwayScore
+    };
+</script>
+
+<div class="court-page" id="courtPage">
+
+    <!-- ── Top score area ─────────────────────────────────────────────────── -->
+    <div class="score-area">
+
+        <!-- Left team name + sets won -->
+        <div class="team-score-block">
+            <div class="team-name-header" id="leftTeamName">@leftTeam.Name</div>
+            <div id="leftSetsDisplay">
+                @for (int i = 0; i < Model.TotalSets / 2 + 1; i++)
+                {
+                    <span class="set-dot @(i < leftSetsWon ? "won" : "")" data-index="@i"></span>
+                }
+            </div>
+            @if (leftIsServing)
+            {
+                <span class="serving-indicator @(leftSide == "Home" ? "home-serving" : "away-serving")" id="leftServingBadge">
+                    <i class="bi bi-volleyball"></i> SERVING
+                </span>
+            }
+            else
+            {
+                <span class="serving-indicator" id="leftServingBadge" style="visibility:hidden">
+                    <i class="bi bi-volleyball"></i> SERVING
+                </span>
+            }
+        </div>
+
+        <!-- Left score digits -->
+        <div class="score-display" id="leftScoreDisplay">
+            @{
+                var ls = leftScore.ToString("D2");
+            }
+            <div class="score-digit" id="leftDigit0">@ls[0]</div>
+            <div class="score-digit" id="leftDigit1">@ls[1]</div>
+        </div>
+
+        <!-- Score controls for left team -->
+        <div class="d-flex flex-column gap-1">
+            <button class="score-btn score-btn-up" id="btnLeftUp" title="Add point"
+                    onclick="addPoint('@leftSide')">
+                <i class="bi bi-chevron-up"></i>
+            </button>
+            <button class="score-btn score-btn-down" id="btnLeftDown" title="Subtract point"
+                    onclick="subtractPoint('@leftSide')">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+
+        <!-- Set info in the middle -->
+        <div class="set-info mx-2">
+            <span class="set-label">SET</span>
+            <div class="set-number-display" id="setNumberDisplay">@Model.CurrentSet.SetNumber</div>
+            <span class="set-label">of @Model.TotalSets</span>
+        </div>
+
+        <!-- Score controls for right team -->
+        <div class="d-flex flex-column gap-1">
+            <button class="score-btn score-btn-up" id="btnRightUp" title="Add point"
+                    onclick="addPoint('@rightSide')">
+                <i class="bi bi-chevron-up"></i>
+            </button>
+            <button class="score-btn score-btn-down" id="btnRightDown" title="Subtract point"
+                    onclick="subtractPoint('@rightSide')">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+
+        <!-- Right score digits -->
+        <div class="score-display" id="rightScoreDisplay">
+            @{
+                var rs = rightScore.ToString("D2");
+            }
+            <div class="score-digit" id="rightDigit0">@rs[0]</div>
+            <div class="score-digit" id="rightDigit1">@rs[1]</div>
+        </div>
+
+        <!-- Right team name + sets won -->
+        <div class="team-score-block">
+            @if (rightIsServing)
+            {
+                <span class="serving-indicator @(rightSide == "Home" ? "home-serving" : "away-serving")" id="rightServingBadge">
+                    <i class="bi bi-volleyball"></i> SERVING
+                </span>
+            }
+            else
+            {
+                <span class="serving-indicator" id="rightServingBadge" style="visibility:hidden">
+                    <i class="bi bi-volleyball"></i> SERVING
+                </span>
+            }
+            <div id="rightSetsDisplay">
+                @for (int i = 0; i < Model.TotalSets / 2 + 1; i++)
+                {
+                    <span class="set-dot @(i < rightSetsWon ? "won" : "")" data-index="@i"></span>
+                }
+            </div>
+            <div class="team-name-header" id="rightTeamName">@rightTeam.Name</div>
+        </div>
+    </div>
+
+    <!-- ── Main court area ────────────────────────────────────────────────── -->
+    <div class="court-body">
+
+        <!-- Left roster panel -->
+        <div class="player-roster" id="leftRoster">
+            <div class="roster-header">@leftTeam.Name</div>
+            <div class="roster-list" id="leftRosterList">
+                @foreach (var p in leftPlayers)
+                {
+                    var onCourt = leftPositions.Any(pos => pos.Player?.Id == p.Id);
+                    <div class="player-badge @(onCourt ? "on-court" : "")"
+                         data-player-id="@p.Id"
+                         data-player-number="@p.Number"
+                         data-player-name="@p.Name"
+                         data-team-id="@p.TeamId"
+                         data-side="@leftSide"
+                         id="badge-@p.Id">
+                        <div class="player-number-circle">@p.Number</div>
+                        <span class="player-name-label">@p.Name</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Court canvas -->
+        <div class="court-canvas" id="courtCanvas">
+
+            <!-- Left court half -->
+            <div class="court-half left-half" id="leftHalf" data-side="@leftSide">
+                @foreach (var slot in leftPositions)
+                {
+                    <div class="position-slot @(slot.Player != null ? "occupied" : "") @(leftIsServing && slot.Position == 1 ? "pos-1 serving-team" : $"pos-{slot.Position}")"
+                         data-position="@slot.Position"
+                         data-side="@leftSide"
+                         title="Position @slot.Position">
+                        @if (slot.Player != null)
+                        {
+                            <span class="slot-number">@slot.Player.Number</span>
+                            <span class="slot-player-name">@slot.Player.Name</span>
+                        }
+                        else
+                        {
+                            <span class="slot-number" style="color:#bbb">@slot.Position</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Net -->
+            <div class="court-net"></div>
+
+            <!-- Right court half -->
+            <div class="court-half right-half" id="rightHalf" data-side="@rightSide">
+                @foreach (var slot in rightPositions)
+                {
+                    <div class="position-slot @(slot.Player != null ? "occupied" : "") @(rightIsServing && slot.Position == 1 ? "pos-1 serving-team" : $"pos-{slot.Position}")"
+                         data-position="@slot.Position"
+                         data-side="@rightSide"
+                         title="Position @slot.Position">
+                        @if (slot.Player != null)
+                        {
+                            <span class="slot-number">@slot.Player.Number</span>
+                            <span class="slot-player-name">@slot.Player.Name</span>
+                        }
+                        else
+                        {
+                            <span class="slot-number" style="color:#bbb">@slot.Position</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right roster panel -->
+        <div class="player-roster away-roster" id="rightRoster">
+            <div class="roster-header">@rightTeam.Name</div>
+            <div class="roster-list" id="rightRosterList">
+                @foreach (var p in rightPlayers)
+                {
+                    var onCourt = rightPositions.Any(pos => pos.Player?.Id == p.Id);
+                    <div class="player-badge @(onCourt ? "on-court" : "")"
+                         data-player-id="@p.Id"
+                         data-player-number="@p.Number"
+                         data-player-name="@p.Name"
+                         data-team-id="@p.TeamId"
+                         data-side="@rightSide"
+                         id="badge-@p.Id">
+                        <div class="player-number-circle">@p.Number</div>
+                        <span class="player-name-label">@p.Name</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toolbar ──────────────────────────────────────────────────────── -->
+    <div class="court-toolbar">
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-action="Index" class="btn btn-outline-secondary toolbar-btn">
+                <i class="bi bi-arrow-left me-1"></i> Back
+            </a>
+            <button id="btnSwitchSides" class="btn btn-outline-warning toolbar-btn"
+                    onclick="switchSides()">
+                <i class="bi bi-arrow-left-right me-1"></i> Switch Sides
+            </button>
+            <button id="btnStartMatch" class="btn btn-success toolbar-btn"
+                    onclick="startMatch()"
+                    style="@(Model.Match.Status == MatchStatus.InProgress || Model.Match.Status == MatchStatus.Completed ? "display:none" : "")">
+                <i class="bi bi-play-fill me-1"></i> Start Match
+            </button>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span id="matchStatusText" class="badge fs-6 @(Model.Match.Status == MatchStatus.InProgress ? "bg-success" : Model.Match.Status == MatchStatus.Completed ? "bg-dark" : "bg-secondary")">
+                @Model.Match.Status
+            </span>
+            <a asp-controller="Score" asp-action="Display" asp-route-id="@Model.Match.Id"
+               class="btn btn-dark toolbar-btn" target="_blank">
+                <i class="bi bi-display me-1"></i> Open Display Screen
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── Match Complete Overlay ──────────────────────────────────────────── -->
+<div class="court-overlay" id="matchCompleteOverlay" style="display:none">
+    <div class="court-overlay-card">
+        <i class="bi bi-trophy-fill text-warning" style="font-size:3rem"></i>
+        <h2 class="mt-3 fw-bold" id="winnerText">Winner!</h2>
+        <p class="text-muted" id="winnerSubText">Match complete</p>
+        <div class="d-flex gap-2 justify-content-center mt-3">
+            <a asp-action="Index" class="btn btn-primary">Back to Matches</a>
+            <button class="btn btn-outline-secondary" onclick="document.getElementById('matchCompleteOverlay').style.display='none'">
+                Continue Viewing
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Set Complete Overlay ────────────────────────────────────────────── -->
+<div class="court-overlay" id="setCompleteOverlay" style="display:none">
+    <div class="court-overlay-card">
+        <i class="bi bi-check-circle-fill text-success" style="font-size:3rem"></i>
+        <h3 class="mt-3 fw-bold" id="setWinnerText">Set Complete!</h3>
+        <p class="text-muted" id="setCompleteSubText">Starting next set...</p>
+        <button class="btn btn-success mt-3" onclick="dismissSetComplete()">
+            <i class="bi bi-arrow-right me-1"></i> Continue
+        </button>
+    </div>
+</div>
+
+<!-- ── Error Toast ──────────────────────────────────────────────────────── -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 3000">
+    <div id="errorToast" class="toast align-items-center text-bg-danger border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body" id="errorToastMessage">Error</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                    data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- SignalR client (for listening to score updates on same page) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"
+            integrity="sha512-4GHGdv3AEfv5HBBG5opaRY4v9bGCvLxGq/lJJXXhfmb8a0MAnI5QsFRTjGMwPKerLI1hq3o7UaE/E0Y5nkGA=="
+            crossorigin="anonymous"></script>
+    <script src="~/js/court.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,44 @@
+@* File: VolleyScore/Views/Teams/Delete.cshtml *@
+@model VolleyScore.Models.Team
+@{
+    ViewData["Title"] = "Delete Team";
+}
+
+<div class="container py-4" style="max-width:520px">
+    <div class="d-flex align-items-center mb-4">
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <h2 class="mb-0 text-danger">Delete Team</h2>
+    </div>
+
+    <div class="card border-danger">
+        <div class="card-body p-4">
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                This will permanently delete team <strong>@Model.Name</strong> and all
+                <strong>@Model.Players.Count</strong> associated player(s).
+            </div>
+
+            <dl class="row">
+                <dt class="col-sm-4">Team Name</dt>
+                <dd class="col-sm-8">@Model.Name</dd>
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <dt class="col-sm-4">Description</dt>
+                    <dd class="col-sm-8">@Model.Description</dd>
+                }
+                <dt class="col-sm-4">Players</dt>
+                <dd class="col-sm-8">@Model.Players.Count</dd>
+            </dl>
+
+            <form asp-action="Delete" method="post" class="d-flex gap-2 mt-3">
+                <input type="hidden" asp-for="Id" />
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash me-1"></i> Delete
+                </button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>

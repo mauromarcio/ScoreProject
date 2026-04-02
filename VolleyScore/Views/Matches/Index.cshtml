@@ -1,0 +1,95 @@
+@* File: VolleyScore/Views/Matches/Index.cshtml *@
+@model IEnumerable<VolleyScore.Models.Match>
+@{
+    ViewData["Title"] = "Matches";
+}
+
+<div class="container-fluid py-4 px-4">
+    <div class="d-flex align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-trophy me-2 text-warning"></i>Matches</h2>
+        <a asp-action="Create" class="btn btn-primary ms-auto">
+            <i class="bi bi-plus-circle me-1"></i> New Match
+        </a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="card">
+            <div class="card-body text-center py-5 text-muted">
+                <i class="bi bi-calendar-x" style="font-size:2rem"></i>
+                <p class="mt-2">No matches created yet.</p>
+                <a asp-action="Create" class="btn btn-primary">Create First Match</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Reference</th>
+                                <th>Home Team</th>
+                                <th class="text-center">Sets</th>
+                                <th>Away Team</th>
+                                <th class="text-center">Set</th>
+                                <th class="text-center">Score</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in Model)
+                            {
+                                var currentSet = m.Sets.FirstOrDefault(s => s.SetNumber == m.CurrentSetNumber);
+                                var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                                var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                                <tr>
+                                    <td><strong>@m.MatchReference</strong></td>
+                                    <td>@m.HomeTeam?.Name</td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-success">@homeSets</span>
+                                        <span class="text-muted mx-1">–</span>
+                                        <span class="fw-bold text-primary">@awaySets</span>
+                                        <span class="text-muted small ms-1">(bo@m.TotalSets)</span>
+                                    </td>
+                                    <td>@m.AwayTeam?.Name</td>
+                                    <td class="text-center">@m.CurrentSetNumber</td>
+                                    <td class="text-center fw-bold fs-5">
+                                        @(currentSet?.HomeScore ?? 0) – @(currentSet?.AwayScore ?? 0)
+                                    </td>
+                                    <td class="text-center">
+                                        @{
+                                            var (cls, txt) = m.Status switch
+                                            {
+                                                MatchStatus.Setup => ("bg-secondary", "Setup"),
+                                                MatchStatus.InProgress => ("bg-success", "Live"),
+                                                MatchStatus.Completed => ("bg-dark", "Done"),
+                                                _ => ("bg-secondary", "?")
+                                            };
+                                        }
+                                        <span class="badge @cls">@txt</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <a asp-action="Court" asp-route-id="@m.Id"
+                                               class="btn btn-sm btn-primary" title="Open Court">
+                                                <i class="bi bi-grid-3x3-gap"></i>
+                                            </a>
+                                            <a asp-controller="Score" asp-action="Display" asp-route-id="@m.Id"
+                                               class="btn btn-sm btn-outline-dark" title="Score Display" target="_blank">
+                                                <i class="bi bi-display"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>

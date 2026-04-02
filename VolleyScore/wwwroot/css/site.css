@@ -1,0 +1,194 @@
+/* File: VolleyScore/wwwroot/css/site.css
+   Purpose: Global application styles */
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+html, body {
+    height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f4f6f9;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Navbar ─────────────────────────────────────────────────────────────── */
+.navbar-brand {
+    font-size: 1.3rem;
+    letter-spacing: 0.5px;
+}
+
+/* ── Card styles ─────────────────────────────────────────────────────────── */
+.card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border-radius: 12px;
+}
+
+.card-header {
+    border-radius: 12px 12px 0 0 !important;
+    font-weight: 600;
+}
+
+/* ── Player badge (circle with number) ──────────────────────────────────── */
+.player-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    background: #fff;
+    border: 2px solid #dee2e6;
+    border-radius: 50px;
+    cursor: grab;
+    transition: all 0.15s ease;
+    user-select: none;
+    margin-bottom: 6px;
+}
+
+.player-badge:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
+}
+
+.player-badge.ui-draggable-dragging {
+    opacity: 0.85;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    cursor: grabbing;
+    z-index: 9999;
+}
+
+.player-badge.on-court {
+    opacity: 0.4;
+    border-style: dashed;
+    cursor: not-allowed;
+}
+
+.player-number-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #fff;
+    border: 2.5px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.player-name-label {
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 110px;
+}
+
+/* ── Score flip counter ───────────────────────────────────────────────────── */
+.score-display {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.score-digit {
+    width: 64px;
+    height: 84px;
+    background: #1a1a1a;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.2rem;
+    font-weight: 900;
+    color: #f5c542;
+    font-family: 'Courier New', Courier, monospace;
+    box-shadow: inset 0 -4px 8px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
+    border: 2px solid #333;
+    position: relative;
+    overflow: hidden;
+}
+
+.score-digit::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    background: rgba(0,0,0,0.4);
+}
+
+/* Score flip animation */
+@keyframes flipDown {
+    0%   { transform: rotateX(0deg); }
+    50%  { transform: rotateX(-90deg); }
+    100% { transform: rotateX(0deg); }
+}
+
+.score-digit.flip {
+    animation: flipDown 0.35s ease-in-out;
+}
+
+/* ── Score buttons ────────────────────────────────────────────────────────── */
+.score-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    font-weight: bold;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+}
+
+.score-btn:active {
+    transform: scale(0.92);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.score-btn-up {
+    background: radial-gradient(circle at 35% 35%, #5dd95d, #28a745);
+    color: #fff;
+}
+
+.score-btn-down {
+    background: radial-gradient(circle at 35% 35%, #f55, #dc3545);
+    color: #fff;
+}
+
+/* ── Set indicators ──────────────────────────────────────────────────────── */
+.set-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 2px solid #ccc;
+    background: #fff;
+    margin: 2px;
+}
+
+.set-dot.won {
+    background: #28a745;
+    border-color: #1e7e34;
+}
+
+/* ── Display screen (Part 2) ─────────────────────────────────────────────── */
+body.display-screen {
+    background: #0a0a0a;
+    color: #fff;
+    overflow: hidden;
+}
+
+/* ── Home page match card ─────────────────────────────────────────────────── */
+.match-status-badge {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}

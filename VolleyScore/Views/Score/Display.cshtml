@@ -1,0 +1,285 @@
+@* File: VolleyScore/Views/Score/Display.cshtml *@
+@* Purpose: Part 2 – Big-screen score display. Opens on a separate monitor/computer.
+            Connects to SignalR and updates in real time when operator changes score. *@
+@model VolleyScore.ViewModels.ScoreDisplayViewModel
+@{
+    ViewData["Title"] = Model.MatchReference + " – Display";
+    Layout = "_LayoutDisplay";
+}
+
+@section Styles {
+<style>
+    /* Full-screen dark scoreboard */
+    body.display-screen {
+        background: #0d0d0d;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .display-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        padding: 20px;
+        gap: 16px;
+    }
+
+    /* Match header */
+    .display-header {
+        text-align: center;
+        color: #aaa;
+        font-size: 1.1rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    .display-header .match-ref {
+        color: #fff;
+        font-size: 1.4rem;
+    }
+
+    /* Main score row */
+    .display-score-row {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+    }
+
+    /* Team block */
+    .display-team {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+    }
+
+    .display-team-name {
+        font-size: clamp(2rem, 5vw, 4rem);
+        font-weight: 900;
+        color: #ffffff;
+        text-align: center;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        line-height: 1.1;
+        padding: 0 20px;
+        word-break: break-word;
+    }
+
+    /* Set dots */
+    .display-set-dots {
+        display: flex;
+        gap: 12px;
+    }
+
+    .display-set-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 3px solid #444;
+        background: transparent;
+        transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .display-set-dot.won {
+        background: #f5c542;
+        border-color: #f5c542;
+        box-shadow: 0 0 12px rgba(245, 197, 66, 0.6);
+    }
+
+    /* Score number */
+    .display-score-number {
+        font-size: clamp(8rem, 22vw, 18rem);
+        font-weight: 900;
+        color: #f5c542;
+        font-family: 'Courier New', Courier, monospace;
+        line-height: 0.9;
+        text-shadow:
+            0 0 40px rgba(245, 197, 66, 0.4),
+            0 4px 20px rgba(0,0,0,0.8);
+        transition: transform 0.15s ease;
+        min-width: 1ch;
+        text-align: center;
+    }
+
+    .display-score-number.score-flash {
+        transform: scale(1.08);
+        color: #fff;
+    }
+
+    /* Divider / net */
+    .display-divider {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0 24px;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .display-colon {
+        font-size: clamp(5rem, 14vw, 12rem);
+        font-weight: 900;
+        color: #444;
+        line-height: 1;
+        font-family: 'Courier New', Courier, monospace;
+    }
+
+    /* Set counter */
+    .display-sets-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        flex-shrink: 0;
+    }
+
+    .display-sets-score {
+        font-size: clamp(1.5rem, 4vw, 3rem);
+        font-weight: 700;
+        color: #ccc;
+    }
+
+    .display-sets-score .sets-home,
+    .display-sets-score .sets-away {
+        color: #f5c542;
+    }
+
+    .display-set-label {
+        font-size: 1.1rem;
+        color: #555;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    /* Serving indicator */
+    .display-serving {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #43a047;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        padding: 4px 16px;
+        border: 2px solid #43a047;
+        border-radius: 20px;
+        background: rgba(67, 160, 71, 0.1);
+        transition: opacity 0.3s ease;
+    }
+
+    .display-serving.hidden { opacity: 0; }
+
+    /* Connection status indicator */
+    .connection-status {
+        position: fixed;
+        top: 12px;
+        right: 16px;
+        font-size: 0.75rem;
+        color: #444;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        z-index: 100;
+    }
+
+    .conn-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #888;
+        transition: background 0.3s;
+    }
+
+    .conn-dot.connected { background: #4caf50; }
+    .conn-dot.disconnected { background: #f44336; }
+</style>
+}
+
+<div class="display-wrapper">
+
+    <!-- Header -->
+    <div class="display-header">
+        <div class="match-ref">@Model.MatchReference</div>
+        <div id="displaySetInfo">Set <span id="displaySetNumber">@Model.CurrentSetNumber</span></div>
+    </div>
+
+    <!-- Main score area -->
+    <div class="display-score-row">
+
+        <!-- Left team (Home) -->
+        <div class="display-team" id="displayHomeTeam">
+            <div class="display-team-name" id="displayHomeTeamName">@Model.HomeTeamName</div>
+            <div class="display-set-dots" id="displayHomeDots">
+                @for (int i = 0; i < (Model.TotalSets / 2 + 1); i++)
+                {
+                    <div class="display-set-dot @(i < Model.HomeSetsWon ? "won" : "")"
+                         data-index="@i"></div>
+                }
+            </div>
+            <div class="display-score-number" id="displayHomeScore">@Model.HomeScore</div>
+            <div class="display-serving @(Model.HomeIsServing ? "" : "hidden")"
+                 id="displayHomeServing">SERVING</div>
+        </div>
+
+        <!-- Divider -->
+        <div class="display-divider">
+            <div class="display-colon">:</div>
+        </div>
+
+        <!-- Right team (Away) -->
+        <div class="display-team" id="displayAwayTeam">
+            <div class="display-serving @(!Model.HomeIsServing ? "" : "hidden")" id="displayAwayServing">SERVING</div>
+            <div class="display-score-number" id="displayAwayScore">@Model.AwayScore</div>
+            <div class="display-set-dots" id="displayAwayDots">
+                @for (int i = 0; i < (Model.TotalSets / 2 + 1); i++)
+                {
+                    <div class="display-set-dot @(i < Model.AwaySetsWon ? "won" : "")"
+                         data-index="@i"></div>
+                }
+            </div>
+            <div class="display-team-name" id="displayAwayTeamName">@Model.AwayTeamName</div>
+        </div>
+    </div>
+
+    <!-- Sets won row -->
+    <div class="display-sets-row">
+        <div class="display-set-label">SETS</div>
+        <div class="display-sets-score">
+            <span class="sets-home" id="displayHomeSets">@Model.HomeSetsWon</span>
+            <span style="color:#444"> – </span>
+            <span class="sets-away" id="displayAwaySets">@Model.AwaySetsWon</span>
+        </div>
+    </div>
+
+</div>
+
+<!-- Real-time connection status dot -->
+<div class="connection-status">
+    <div class="conn-dot" id="connDot"></div>
+    <span id="connText"></span>
+</div>
+
+@section Scripts {
+<script>
+    // Pass server-rendered initial state to the display JS
+    var DISPLAY_DATA = {
+        matchId: @Model.MatchId,
+        homeTeamName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.HomeTeamName)),
+        awayTeamName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AwayTeamName)),
+        homeScore: @Model.HomeScore,
+        awayScore: @Model.AwayScore,
+        homeSetsWon: @Model.HomeSetsWon,
+        awaySetsWon: @Model.AwaySetsWon,
+        currentSetNumber: @Model.CurrentSetNumber,
+        totalSets: @Model.TotalSets,
+        homeIsServing: @Model.HomeIsServing.ToString().ToLower()
+    };
+</script>
+<script src="~/js/display.js" asp-append-version="true"></script>
+}

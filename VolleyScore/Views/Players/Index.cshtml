@@ -1,0 +1,100 @@
+@* File: VolleyScore/Views/Players/Index.cshtml *@
+@model IEnumerable<VolleyScore.Models.Player>
+@{
+    ViewData["Title"] = "Players";
+    var filterTeam = ViewBag.FilterTeam as VolleyScore.Models.Team;
+    var teams = ViewBag.Teams as IEnumerable<VolleyScore.Models.Team>;
+}
+
+<div class="container py-4">
+    <div class="d-flex align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="mb-0">
+            <i class="bi bi-person-badge me-2 text-success"></i>
+            Players@(filterTeam != null ? $" – {filterTeam.Name}" : "")
+        </h2>
+        <a asp-action="Create" asp-route-teamId="@filterTeam?.Id" class="btn btn-success ms-auto">
+            <i class="bi bi-plus-circle me-1"></i> Add Player
+        </a>
+    </div>
+
+    <!-- Team filter -->
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <span class="fw-semibold text-muted small">FILTER BY TEAM:</span>
+                <a asp-action="Index" class="btn btn-sm @(filterTeam == null ? "btn-dark" : "btn-outline-dark")">
+                    All Teams
+                </a>
+                @if (teams != null)
+                {
+                    @foreach (var t in teams)
+                    {
+                        <a asp-action="Index" asp-route-teamId="@t.Id"
+                           class="btn btn-sm @(filterTeam?.Id == t.Id ? "btn-primary" : "btn-outline-primary")">
+                            @t.Name
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="card">
+            <div class="card-body text-center py-5 text-muted">
+                <i class="bi bi-person-plus" style="font-size:2rem"></i>
+                <p class="mt-2">No players found.</p>
+                <a asp-action="Create" asp-route-teamId="@filterTeam?.Id" class="btn btn-success">
+                    Add First Player
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width:80px" class="text-center">#</th>
+                                <th>Player Name</th>
+                                <th>Team</th>
+                                <th class="text-center" style="width:150px">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var player in Model)
+                            {
+                                <tr>
+                                    <td class="text-center">
+                                        <div class="player-number-circle mx-auto"
+                                             style="width:38px;height:38px;font-size:1rem">
+                                            @player.Number
+                                        </div>
+                                    </td>
+                                    <td class="fw-semibold">@player.Name</td>
+                                    <td>
+                                        <span class="badge bg-secondary">@player.Team?.Name</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <a asp-action="Edit" asp-route-id="@player.Id"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a asp-action="Delete" asp-route-id="@player.Id"
+                                           class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
