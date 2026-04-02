@@ -22,9 +22,8 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"
             integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
             crossorigin="anonymous"></script>
-    <!-- SignalR client -->
+    <!-- SignalR client - no SRI hash to prevent silent load failures -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"
-            integrity="sha512-4GHGdv3AEfv5HBBG5opaRY4v9bGCvLxGq/lJJXXhfmb8a0MAnI5QsFRTjGMwPKerLI1hq3o7UaE/E0Y5nkGA=="
             crossorigin="anonymous"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

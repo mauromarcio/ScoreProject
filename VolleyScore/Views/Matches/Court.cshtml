@@ -309,9 +309,8 @@
 </div>
 
 @section Scripts {
-    <!-- SignalR client (for listening to score updates on same page) -->
+    <!-- SignalR client - no SRI hash to prevent silent load failures -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"
-            integrity="sha512-4GHGdv3AEfv5HBBG5opaRY4v9bGCvLxGq/lJJXXhfmb8a0MAnI5QsFRTjGMwPKerLI1hq3o7UaE/E0Y5nkGA=="
             crossorigin="anonymous"></script>
     <script src="~/js/court.js" asp-append-version="true"></script>
 }
