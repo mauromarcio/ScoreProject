@@ -94,6 +94,28 @@ using (var scope = app.Services.CreateScope())
                 )
             END
         ");
+
+        // ── ALTER TABLE upgrades for tables that exist with old column names ──
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'PoolSetsPerMatch')
+                ALTER TABLE Tournaments ADD PoolSetsPerMatch INT NOT NULL DEFAULT 2;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'PlayoffSetsPerMatch')
+                ALTER TABLE Tournaments ADD PlayoffSetsPerMatch INT NOT NULL DEFAULT 3;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'Description')
+                ALTER TABLE Tournaments ADD Description NVARCHAR(300) NULL;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'InitialScore')
+                ALTER TABLE Tournaments ADD InitialScore INT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'Status')
+                ALTER TABLE Tournaments ADD Status INT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'CreatedAt')
+                ALTER TABLE Tournaments ADD CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE();
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentTeams' AND COLUMN_NAME = 'SeedOrder')
+                ALTER TABLE TournamentTeams ADD SeedOrder INT NOT NULL DEFAULT 1;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'Stage')
+                ALTER TABLE TournamentMatches ADD Stage INT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'MatchNumber')
+                ALTER TABLE TournamentMatches ADD MatchNumber INT NOT NULL DEFAULT 1;
+        ");
     }
     catch (Exception ex)
     {
