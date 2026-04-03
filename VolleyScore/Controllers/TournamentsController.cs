@@ -331,6 +331,23 @@ public class TournamentsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // GET: Tournaments/Manage/5  – combined management view (teams, matches, status)
+    public async Task<IActionResult> Manage(int id)
+    {
+        var tournament = await LoadTournament(id);
+        if (tournament == null) return NotFound();
+        return View(tournament);
+    }
+
+    // GET: Tournaments/Report/5  – printable results report
+    public async Task<IActionResult> Report(int id)
+    {
+        var tournament = await LoadTournament(id);
+        if (tournament == null) return NotFound();
+        var vm = BuildBracketViewModel(tournament);
+        return View(vm);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private async Task<Tournament?> LoadTournament(int id)

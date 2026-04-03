@@ -1,0 +1,255 @@
+@* File: VolleyScore/Views/Tournaments/Manage.cshtml *@
+@* Purpose: Tournament management – teams seed order, all matches grouped by stage, settings overview *@
+@model VolleyScore.Models.Tournament
+@using VolleyScore.Models
+@{
+    ViewData["Title"] = Model.Name + " – Manage";
+
+    var teams       = Model.TournamentTeams.OrderBy(tt => tt.SeedOrder).ToList();
+    var poolMatches = Model.TournamentMatches
+                         .Where(tm => tm.Stage == TournamentStage.Pool)
+                         .OrderBy(tm => tm.MatchNumber).ToList();
+    var sfMatches   = Model.TournamentMatches
+                         .Where(tm => tm.Stage == TournamentStage.Semifinal)
+                         .OrderBy(tm => tm.MatchNumber).ToList();
+    var t3Match     = Model.TournamentMatches.FirstOrDefault(tm => tm.Stage == TournamentStage.ThirdPlace);
+    var finalMatch  = Model.TournamentMatches.FirstOrDefault(tm => tm.Stage == TournamentStage.Final);
+
+    int poolDone = poolMatches.Count(tm => tm.Match?.Status == MatchStatus.Completed);
+    int sfDone   = sfMatches.Count(tm => tm.Match?.Status == MatchStatus.Completed);
+}
+
+<div class="container py-4">
+    <div class="d-flex align-items-center mb-4">
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="flex-fill">
+            <h2 class="mb-0">@Model.Name</h2>
+            <p class="text-muted mb-0 small">Manage Tournament</p>
+        </div>
+        <span class="badge fs-6 @(Model.Status == TournamentStatus.Completed ? "bg-dark" :
+                                   Model.Status == TournamentStatus.Playoffs   ? "bg-warning text-dark" :
+                                   Model.Status == TournamentStatus.PoolPlay   ? "bg-success" : "bg-secondary")">
+            @Model.Status
+        </span>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Settings overview -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="fs-2 fw-bold text-primary">@teams.Count</div>
+                    <div class="small text-muted">Teams</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="fs-2 fw-bold text-success">@Model.PoolSetsPerMatch</div>
+                    <div class="small text-muted">Sets / Pool Match</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="fs-2 fw-bold text-warning">@Model.PlayoffSetsPerMatch</div>
+                    <div class="small text-muted">Sets / Playoff</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="card text-center h-100">
+                <div class="card-body py-3">
+                    <div class="fs-2 fw-bold @(Model.InitialScore > 0 ? "text-info" : "text-muted")">@Model.InitialScore</div>
+                    <div class="small text-muted">Initial Score</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- Teams / seed order -->
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Teams &amp; Seed Order</strong>
+                    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-sort-numeric-down me-1"></i> Reorder
+                    </a>
+                </div>
+                <div class="list-group list-group-flush">
+                    @foreach (var tt in teams)
+                    {
+                        <div class="list-group-item d-flex align-items-center gap-3">
+                            <span class="badge bg-secondary rounded-pill">@tt.SeedOrder</span>
+                            <span class="fw-semibold">@tt.Team?.Name</span>
+                        </div>
+                    }
+                    @if (!teams.Any())
+                    {
+                        <div class="list-group-item text-muted text-center py-3">No teams added yet.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Matches by stage -->
+        <div class="col-lg-8">
+
+            <!-- Pool matches -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>
+                        <span class="badge bg-primary me-2">Pool</span>
+                        Pool Matches
+                    </strong>
+                    <span class="text-muted small">@poolDone / @poolMatches.Count completed</span>
+                </div>
+                @if (poolMatches.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var tm in poolMatches)
+                        {
+                            var m = tm.Match;
+                            if (m == null) continue;
+                            var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                            var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                            <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
+                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <span>
+                                    <span class="text-muted small me-1">#@tm.MatchNumber</span>
+                                    <strong>@m.HomeTeam?.Name</strong>
+                                    <span class="text-muted mx-1">vs</span>
+                                    <strong>@m.AwayTeam?.Name</strong>
+                                </span>
+                                <span class="d-flex align-items-center gap-2">
+                                    @if (m.Status == MatchStatus.Completed)
+                                    { <span class="fw-bold">@homeSets – @awaySets</span> }
+                                    <span class="badge @(m.Status == MatchStatus.Completed ? "bg-dark" : m.Status == MatchStatus.InProgress ? "bg-success" : "bg-secondary")">
+                                        @m.Status
+                                    </span>
+                                </span>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="card-body text-muted text-center">
+                        Pool matches not yet generated.
+                        @if (Model.Status == TournamentStatus.Setup)
+                        {
+                            <form asp-action="GeneratePoolMatches" asp-route-id="@Model.Id" method="post" class="mt-2">
+                                <button type="submit" class="btn btn-sm btn-success">Generate Pool Matches</button>
+                            </form>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Semi-finals -->
+            @if (sfMatches.Any())
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>
+                            <span class="badge bg-warning text-dark me-2">SF</span>
+                            Semi-finals
+                        </strong>
+                        <span class="text-muted small">@sfDone / @sfMatches.Count completed</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var tm in sfMatches)
+                        {
+                            var m = tm.Match;
+                            if (m == null) continue;
+                            var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                            var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                            <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
+                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <span>
+                                    <span class="text-muted small me-1">SF@tm.MatchNumber</span>
+                                    <strong>@m.HomeTeam?.Name</strong>
+                                    <span class="text-muted mx-1">vs</span>
+                                    <strong>@m.AwayTeam?.Name</strong>
+                                </span>
+                                <span class="d-flex align-items-center gap-2">
+                                    @if (m.Status == MatchStatus.Completed)
+                                    { <span class="fw-bold">@homeSets – @awaySets</span> }
+                                    <span class="badge @(m.Status == MatchStatus.Completed ? "bg-dark" : m.Status == MatchStatus.InProgress ? "bg-success" : "bg-secondary")">@m.Status</span>
+                                </span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- 3rd place + Final -->
+            @if (t3Match != null || finalMatch != null)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <strong>
+                            <span class="badge bg-danger me-2">Finals</span>
+                            Final Matches
+                        </strong>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @{
+                            var finalsToShow = new[] { t3Match, finalMatch }.Where(x => x != null).OrderBy(x => x!.Stage);
+                            foreach (var tm in finalsToShow)
+                            {
+                                if (tm?.Match == null) continue;
+                                var m   = tm.Match;
+                                var hS  = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                                var aS  = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                                var lbl = tm.Stage == TournamentStage.Final ? "FINAL" : "3RD";
+                                <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    <span>
+                                        <span class="badge @(tm.Stage == TournamentStage.Final ? "bg-danger" : "bg-secondary") me-1">@lbl</span>
+                                        <strong>@m.HomeTeam?.Name</strong>
+                                        <span class="text-muted mx-1">vs</span>
+                                        <strong>@m.AwayTeam?.Name</strong>
+                                    </span>
+                                    <span class="d-flex align-items-center gap-2">
+                                        @if (m.Status == MatchStatus.Completed)
+                                        { <span class="fw-bold">@hS – @aS</span> }
+                                        <span class="badge @(m.Status == MatchStatus.Completed ? "bg-dark" : m.Status == MatchStatus.InProgress ? "bg-success" : "bg-secondary")">@m.Status</span>
+                                    </span>
+                                </a>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <a asp-action="PoolPlay"  asp-route-id="@Model.Id" class="btn btn-outline-primary">
+            <i class="bi bi-table me-1"></i> Pool Standings
+        </a>
+        <a asp-action="Bracket"   asp-route-id="@Model.Id" class="btn btn-outline-warning">
+            <i class="bi bi-diagram-3 me-1"></i> Bracket
+        </a>
+        <a asp-action="Report"    asp-route-id="@Model.Id" class="btn btn-outline-secondary">
+            <i class="bi bi-file-earmark-text me-1"></i> Full Report
+        </a>
+    </div>
+</div>

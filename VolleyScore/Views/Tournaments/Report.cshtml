@@ -1,0 +1,363 @@
+@* File: VolleyScore/Views/Tournaments/Report.cshtml *@
+@* Purpose: Printable tournament results report – pool standings, semi-final results, final results *@
+@model VolleyScore.ViewModels.TournamentBracketViewModel
+@using VolleyScore.Models
+@{
+    ViewData["Title"] = Model.Tournament.Name + " – Report";
+
+    // Semi-finals
+    var sf1 = Model.Semifinals.FirstOrDefault(s => s.MatchNumber == 1);
+    var sf2 = Model.Semifinals.FirstOrDefault(s => s.MatchNumber == 2);
+
+    // Determine match winner helper
+    int? WinnerTeamId(Match? m)
+    {
+        if (m?.Status != MatchStatus.Completed) return null;
+        var hSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+        return hSets >= m.SetsToWin ? m.HomeTeamId : m.AwayTeamId;
+    }
+
+    string SetScore(Match? m)
+    {
+        if (m == null) return "–";
+        var h = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+        var a = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+        return $"{h} – {a}";
+    }
+
+    string PerSetDetail(Match? m)
+    {
+        if (m == null) return "";
+        return string.Join(" | ", m.Sets.OrderBy(s => s.SetNumber)
+            .Select(s => $"Set {s.SetNumber}: {s.HomeScore}–{s.AwayScore}"));
+    }
+}
+
+@section Styles {
+<style>
+    @@media print {
+        .no-print { display: none !important; }
+        .card { border: 1px solid #000 !important; }
+        body { font-size: 12px; }
+    }
+    .report-section-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        border-bottom: 2px solid #333;
+        padding-bottom: 4px;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .winner-highlight { background: #fff9c4; font-weight: 700; }
+</style>
+}
+
+<div class="container py-4" style="max-width:860px">
+
+    <!-- Header -->
+    <div class="d-flex align-items-start mb-4 no-print">
+        <a asp-action="Manage" asp-route-id="@Model.Tournament.Id" class="btn btn-outline-secondary btn-sm me-3 mt-1">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="flex-fill">
+            <h2 class="mb-0">@Model.Tournament.Name – Full Report</h2>
+            <p class="text-muted mb-0 small">@Model.Tournament.CreatedAt.ToString("MMMM d, yyyy")</p>
+        </div>
+        <button class="btn btn-outline-dark btn-sm no-print" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i> Print
+        </button>
+    </div>
+
+    <!-- Print header (only shown when printing) -->
+    <div class="text-center mb-4" style="display:none" id="printHeader">
+        <h2>@Model.Tournament.Name</h2>
+        <p class="text-muted">Tournament Report &bull; @Model.Tournament.CreatedAt.ToString("MMMM d, yyyy")</p>
+    </div>
+
+    <!-- Tournament info -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 text-center">
+                <div class="col-3">
+                    <div class="fw-bold fs-4 text-primary">@Model.Tournament.TournamentTeams.Count</div>
+                    <div class="small text-muted">Teams</div>
+                </div>
+                <div class="col-3">
+                    <div class="fw-bold fs-4 text-success">@Model.Tournament.PoolSetsPerMatch</div>
+                    <div class="small text-muted">Sets / Pool Match</div>
+                </div>
+                <div class="col-3">
+                    <div class="fw-bold fs-4 text-warning">@Model.Tournament.PlayoffSetsPerMatch</div>
+                    <div class="small text-muted">Sets / Playoff</div>
+                </div>
+                <div class="col-3">
+                    <div class="fw-bold fs-4 @(Model.Tournament.InitialScore > 0 ? "text-info" : "text-muted")">
+                        @Model.Tournament.InitialScore
+                    </div>
+                    <div class="small text-muted">Initial Score</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 1. Pool standings ───────────────────────────────────────────────── -->
+    <div class="mb-4">
+        <div class="report-section-title">Pool Play – Final Standings</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:40px">#</th>
+                        <th>Team</th>
+                        <th class="text-center">MP</th>
+                        <th class="text-center">Sets Won</th>
+                        <th class="text-center">Pts Made</th>
+                        <th class="text-center">Pts Against</th>
+                        <th class="text-center">Ratio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Model.Standings.Count; i++)
+                    {
+                        var s = Model.Standings[i];
+                        var rowClass = i == 0 ? "table-success" :
+                                       i == 1 ? "table-info" :
+                                       i == 2 ? "table-warning" :
+                                       i == 3 ? "table-secondary" : "";
+                        var advIcon = i < 4 ? " ⬆" : "";
+                        <tr class="@rowClass">
+                            <td class="fw-bold text-center">@(i + 1)</td>
+                            <td class="fw-semibold">@s.TeamName@advIcon</td>
+                            <td class="text-center">@s.MatchesPlayed</td>
+                            <td class="text-center fw-bold">@s.SetsWon</td>
+                            <td class="text-center">@s.PointsMade</td>
+                            <td class="text-center">@s.PointsAgainst</td>
+                            <td class="text-center">
+                                @(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" :
+                                  s.PointsRatio == double.MaxValue ? "∞" :
+                                  s.PointsRatio.ToString("F3"))
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="small text-muted mt-1">MP = Matches Played &nbsp;|&nbsp; ⬆ = Advances to playoffs &nbsp;|&nbsp; Tiebreaker: Sets Won → Ratio → Pts Made</p>
+    </div>
+
+    <!-- ── 2. Pool match results ───────────────────────────────────────────── -->
+    @{
+        var poolMatches = Model.Tournament.TournamentMatches
+            .Where(tm => tm.Stage == TournamentStage.Pool && tm.Match != null)
+            .OrderBy(tm => tm.MatchNumber).ToList();
+    }
+    @if (poolMatches.Any())
+    {
+        <div class="mb-4">
+            <div class="report-section-title">Pool Play – Match Results</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:40px">#</th>
+                            <th>Home Team</th>
+                            <th class="text-center">Sets</th>
+                            <th>Away Team</th>
+                            <th>Per-Set Detail</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tm in poolMatches)
+                        {
+                            var m       = tm.Match!;
+                            var winner  = WinnerTeamId(m);
+                            var hClass  = winner == m.HomeTeamId ? "winner-highlight" : "";
+                            var aClass  = winner == m.AwayTeamId ? "winner-highlight" : "";
+                            <tr>
+                                <td class="text-center text-muted small">@tm.MatchNumber</td>
+                                <td class="@hClass">@m.HomeTeam?.Name</td>
+                                <td class="text-center fw-bold">@SetScore(m)</td>
+                                <td class="@aClass">@m.AwayTeam?.Name</td>
+                                <td class="text-muted small">@PerSetDetail(m)</td>
+                                <td class="text-center">
+                                    <span class="badge @(m.Status == MatchStatus.Completed ? "bg-dark" : m.Status == MatchStatus.InProgress ? "bg-success" : "bg-secondary")">
+                                        @m.Status
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- ── 3. Semi-finals ────────────────────────────────────────────────── -->
+    @if (Model.Semifinals.Any())
+    {
+        <div class="mb-4">
+            <div class="report-section-title">Semi-finals</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Match</th>
+                            <th>Team A</th>
+                            <th class="text-center">Sets</th>
+                            <th>Team B</th>
+                            <th>Per-Set Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tm in Model.Semifinals.OrderBy(s => s.MatchNumber))
+                        {
+                            var m      = tm.Match;
+                            var winner = WinnerTeamId(m);
+                            var hClass = winner == m?.HomeTeamId ? "winner-highlight" : "";
+                            var aClass = winner == m?.AwayTeamId ? "winner-highlight" : "";
+                            <tr>
+                                <td class="fw-bold">SF @tm.MatchNumber</td>
+                                <td class="@hClass">@m?.HomeTeam?.Name</td>
+                                <td class="text-center fw-bold">@SetScore(m)</td>
+                                <td class="@aClass">@m?.AwayTeam?.Name</td>
+                                <td class="text-muted small">@PerSetDetail(m)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- ── 4. Finals ─────────────────────────────────────────────────────── -->
+    @if (Model.ThirdPlaceMatch != null || Model.FinalMatch != null)
+    {
+        <div class="mb-4">
+            <div class="report-section-title">Finals</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Match</th>
+                            <th>Team A</th>
+                            <th class="text-center">Sets</th>
+                            <th>Team B</th>
+                            <th>Per-Set Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            var finalsRows = new[]
+                            {
+                                (label: "3rd Place", tm: Model.ThirdPlaceMatch),
+                                (label: "Final",     tm: Model.FinalMatch)
+                            }.Where(x => x.tm != null);
+
+                            foreach (var row in finalsRows)
+                            {
+                                var m      = row.tm!.Match;
+                                var winner = WinnerTeamId(m);
+                                var hClass = winner == m?.HomeTeamId ? "winner-highlight" : "";
+                                var aClass = winner == m?.AwayTeamId ? "winner-highlight" : "";
+                                <tr>
+                                    <td class="fw-bold">@row.label</td>
+                                    <td class="@hClass">@m?.HomeTeam?.Name</td>
+                                    <td class="text-center fw-bold">@SetScore(m)</td>
+                                    <td class="@aClass">@m?.AwayTeam?.Name</td>
+                                    <td class="text-muted small">@PerSetDetail(m)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- ── 5. Final classification ──────────────────────────────────────── -->
+    @{
+        var finalM  = Model.FinalMatch?.Match;
+        var third3M = Model.ThirdPlaceMatch?.Match;
+        var champion = finalM?.Status == MatchStatus.Completed
+            ? (WinnerTeamId(finalM) == finalM.HomeTeamId ? finalM.HomeTeam : finalM.AwayTeam)
+            : null;
+        var runnerUp = champion == null ? null
+            : (champion.Id == finalM!.HomeTeamId ? finalM.AwayTeam : finalM.HomeTeam);
+        var thirdPl  = third3M?.Status == MatchStatus.Completed
+            ? (WinnerTeamId(third3M) == third3M.HomeTeamId ? third3M.HomeTeam : third3M.AwayTeam)
+            : null;
+        var fourthPl = thirdPl == null ? null
+            : (thirdPl.Id == third3M!.HomeTeamId ? third3M.AwayTeam : third3M.HomeTeam);
+    }
+    @if (champion != null || runnerUp != null || thirdPl != null)
+    {
+        <div class="mb-4">
+            <div class="report-section-title">Final Classification</div>
+            <div class="row g-3">
+                @if (champion != null)
+                {
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card border-warning text-center">
+                            <div class="card-body py-3">
+                                <div class="fs-1">🥇</div>
+                                <div class="fw-bold">@champion.Name</div>
+                                <div class="text-muted small">Champion</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                @if (runnerUp != null)
+                {
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card border-secondary text-center">
+                            <div class="card-body py-3">
+                                <div class="fs-1">🥈</div>
+                                <div class="fw-bold">@runnerUp.Name</div>
+                                <div class="text-muted small">Runner-up</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                @if (thirdPl != null)
+                {
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card border-secondary text-center">
+                            <div class="card-body py-3">
+                                <div class="fs-1">🥉</div>
+                                <div class="fw-bold">@thirdPl.Name</div>
+                                <div class="text-muted small">3rd Place</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                @if (fourthPl != null)
+                {
+                    <div class="col-sm-6 col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body py-3">
+                                <div class="fs-1">4️⃣</div>
+                                <div class="fw-bold">@fourthPl.Name</div>
+                                <div class="text-muted small">4th Place</div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+</div>
+
+@section Scripts {
+<script>
+    // Show print-only header when printing
+    window.addEventListener('beforeprint', function() {
+        document.getElementById('printHeader').style.display = '';
+    });
+    window.addEventListener('afterprint', function() {
+        document.getElementById('printHeader').style.display = 'none';
+    });
+</script>
+}
