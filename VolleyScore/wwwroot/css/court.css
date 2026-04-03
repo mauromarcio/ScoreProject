@@ -312,6 +312,249 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.4);
 }
 
+/* ── Score Tally Panel (floating, draggable, resizable) ─────────────────── */
+.score-tally-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    min-width: 240px;
+    min-height: 180px;
+    background: #fff;
+    border: 2px solid #555;
+    border-radius: 6px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+    z-index: 1500;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Drag handle */
+.tally-handle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    background: #343a40;
+    color: #fff;
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
+}
+.tally-handle:active { cursor: grabbing; }
+
+.tally-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: sans-serif;
+}
+
+.tally-handle-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.tally-handle-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.4);
+    color: #fff;
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-family: sans-serif;
+}
+.tally-handle-btn:hover { background: rgba(255,255,255,0.2); }
+
+/* Content wrapper */
+.tally-content {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Score numbers table */
+.tally-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+    line-height: 1.1;
+    flex-shrink: 0;
+}
+
+.tally-table th,
+.tally-table td {
+    padding: 1px 3px;
+    text-align: center;
+    border: 1px solid #ccc;
+}
+
+.tally-team-hdr {
+    background: #343a40;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+    padding: 3px 4px;
+}
+
+.tally-sub-hdr {
+    background: #e9ecef;
+    color: #333;
+    font-weight: 700;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border: 1px solid #aaa;
+}
+
+/* Vertical separator between two sides */
+.tally-sep {
+    width: 6px;
+    background: #333;
+    border: none !important;
+    padding: 0 !important;
+}
+
+/* Number cells */
+.tally-num {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #333;
+    width: 22px;
+    min-width: 18px;
+    border: 1px solid #ddd;
+    transition: background 0.15s, color 0.15s;
+    border-radius: 0;
+    line-height: 1.4;
+}
+
+.tally-num.scored {
+    background: #e53935;
+    color: #fff;
+    font-weight: 700;
+    position: relative;
+    text-decoration: line-through;
+    text-decoration-color: rgba(255,255,255,0.8);
+    text-decoration-thickness: 2px;
+}
+
+/* Time-out section */
+.tally-timeout-hdr {
+    background: #e9ecef;
+    color: #333;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    border: 1px solid #aaa;
+    padding: 2px 3px;
+}
+
+.tally-timeout-cell {
+    text-align: center;
+    padding: 3px 2px;
+    border: 1px solid #ccc;
+}
+
+.tally-to {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #555;
+    cursor: pointer;
+    margin: 0 3px;
+    background: transparent;
+    transition: background 0.2s;
+    vertical-align: middle;
+    line-height: 14px;
+    font-size: 0;  /* hide text */
+}
+.tally-to.used {
+    background: #e53935;
+    border-color: #c62828;
+}
+.tally-to:hover { border-color: #1976d2; }
+
+/* Next Server row */
+.tally-server-row {
+    display: flex;
+    align-items: stretch;
+    border-top: 2px solid #333;
+    flex-shrink: 0;
+    font-family: sans-serif;
+}
+
+.tally-server-cell {
+    flex: 1;
+    text-align: center;
+    padding: 4px 6px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #555;
+    line-height: 1.3;
+    background: #f8f9fa;
+    min-height: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.tally-server-cell.is-serving {
+    background: #fff9c4;
+    color: #1b5e20;
+}
+
+.tally-server-cell .server-label {
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #888;
+    margin-bottom: 1px;
+}
+.tally-server-cell.is-serving .server-label { color: #2e7d32; }
+
+.tally-server-cell .server-name {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #222;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+.tally-server-cell.is-serving .server-name { color: #1b5e20; }
+
+.tally-server-sep {
+    width: 6px;
+    background: #333;
+    flex-shrink: 0;
+}
+
+/* jQuery UI resize handle override */
+.ui-resizable-handle {
+    z-index: 1501;
+}
+
 /* ── Responsive adjustments ─────────────────────────────────────────────── */
 @media (max-width: 992px) {
     .player-roster { width: 150px; }

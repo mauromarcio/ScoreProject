@@ -244,6 +244,18 @@
         homeSetsWon = result.homeSetsWon;
         awaySetsWon = result.awaySetsWon;
 
+        // ── Update tally panel ────────────────────────────────────────────────
+        updateTallyScores(leftScore, rightScore);
+
+        // Update next server from rotated positions
+        var homePositions = result.homeCourtPositions || [];
+        var awayPositions = result.awayCourtPositions || [];
+        var leftPositions  = homeTeamOnLeft ? homePositions : awayPositions;
+        var rightPositions = homeTeamOnLeft ? awayPositions : homePositions;
+        var leftServer  = getServerFromPositions(leftPositions)  || getServerFromDom('left');
+        var rightServer = getServerFromPositions(rightPositions) || getServerFromDom('right');
+        updateTallyServer(leftServer, rightServer, leftIsServing);
+
         // Handle set/match completion
         if (result.matchCompleted) {
             matchStatus = 'Completed';
@@ -412,6 +424,193 @@
         return $('input[name="__RequestVerificationToken"]').val() || '';
     }
 
+    // ── Score Tally Panel ─────────────────────────────────────────────────────
+    // Builds the number grid, wires jQuery UI draggable + resizable,
+    // auto-checks cells up to the initial (handicap) score on load,
+    // and updates whenever a point is scored.
+
+    var TALLY_MAX = 36;   // highest point shown on the tally sheet
+    var tallyMinimised = false;
+
+    function initTallyPanel() {
+        buildTallyTable();
+        restoreTallyPosition();
+
+        // Make panel draggable (by its handle bar)
+        $('#scoreTallyPanel').draggable({
+            handle: '#tallyHandle',
+            containment: 'window',
+            stop: saveTallyPosition
+        });
+
+        // Make panel resizable on all edges
+        $('#scoreTallyPanel').resizable({
+            handles: 'all',
+            minWidth: 240,
+            minHeight: 180,
+            stop: saveTallyPosition
+        });
+
+        // Apply handicap checks immediately
+        var initLeftScore  = homeTeamOnLeft ? COURT_DATA.homeScore : COURT_DATA.awayScore;
+        var initRightScore = homeTeamOnLeft ? COURT_DATA.awayScore : COURT_DATA.homeScore;
+        updateTallyScores(initLeftScore, initRightScore);
+
+        // Initial next-server display (read player at position 1 from rendered DOM)
+        var initLeftIsServing = homeTeamOnLeft ? homeIsServing : !homeIsServing;
+        var leftServerInfo  = getServerFromDom('left');
+        var rightServerInfo = getServerFromDom('right');
+        updateTallyServer(leftServerInfo, rightServerInfo, initLeftIsServing);
+    }
+
+    function buildTallyTable() {
+        var leftName  = homeTeamOnLeft ? COURT_DATA.homeTeamName : COURT_DATA.awayTeamName;
+        var rightName = homeTeamOnLeft ? COURT_DATA.awayTeamName : COURT_DATA.homeTeamName;
+
+        var html = '<thead>';
+        // Team name headers
+        html += '<tr>' +
+            '<th colspan="3" class="tally-team-hdr" id="tallyTeamLeft" title="' + esc(leftName) + '">' + esc(truncate(leftName, 12)) + '</th>' +
+            '<th class="tally-sep"></th>' +
+            '<th colspan="3" class="tally-team-hdr" id="tallyTeamRight" title="' + esc(rightName) + '">' + esc(truncate(rightName, 12)) + '</th>' +
+            '</tr>';
+        // "Points" sub-header
+        html += '<tr>' +
+            '<th class="tally-sub-hdr" colspan="3">Points</th>' +
+            '<th class="tally-sep"></th>' +
+            '<th class="tally-sub-hdr" colspan="3">Points</th>' +
+            '</tr>';
+        html += '</thead><tbody>';
+
+        // 12 rows: each row shows N, N+12, N+24 for each side
+        for (var n = 1; n <= 12; n++) {
+            var c1 = n, c2 = n + 12, c3 = n + 24;
+            html += '<tr>' +
+                '<td class="tally-num" id="lnum-' + c1 + '">' + c1 + '</td>' +
+                '<td class="tally-num" id="lnum-' + c2 + '">' + c2 + '</td>' +
+                '<td class="tally-num" id="lnum-' + c3 + '">' + c3 + '</td>' +
+                '<td class="tally-sep"></td>' +
+                '<td class="tally-num" id="rnum-' + c1 + '">' + c1 + '</td>' +
+                '<td class="tally-num" id="rnum-' + c2 + '">' + c2 + '</td>' +
+                '<td class="tally-num" id="rnum-' + c3 + '">' + c3 + '</td>' +
+                '</tr>';
+        }
+
+        html += '</tbody><tfoot>';
+        // Time-outs section
+        html += '<tr>' +
+            '<td colspan="3" class="tally-timeout-hdr">Time Outs</td>' +
+            '<td class="tally-sep"></td>' +
+            '<td colspan="3" class="tally-timeout-hdr">Time Outs</td>' +
+            '</tr>';
+        html += '<tr>' +
+            '<td colspan="3" class="tally-timeout-cell">' +
+                '<span class="tally-to" id="lto-1" onclick="tallyTimeoutClick(this)"></span>' +
+                '<span class="tally-to" id="lto-2" onclick="tallyTimeoutClick(this)"></span>' +
+            '</td>' +
+            '<td class="tally-sep"></td>' +
+            '<td colspan="3" class="tally-timeout-cell">' +
+                '<span class="tally-to" id="rto-1" onclick="tallyTimeoutClick(this)"></span>' +
+                '<span class="tally-to" id="rto-2" onclick="tallyTimeoutClick(this)"></span>' +
+            '</td>' +
+            '</tr>';
+        html += '</tfoot>';
+
+        document.getElementById('tallyTable').innerHTML = html;
+    }
+
+    function updateTallyScores(leftScore, rightScore) {
+        for (var i = 1; i <= TALLY_MAX; i++) {
+            var lEl = document.getElementById('lnum-' + i);
+            var rEl = document.getElementById('rnum-' + i);
+            if (lEl) lEl.className = 'tally-num' + (i <= leftScore ? ' scored' : '');
+            if (rEl) rEl.className = 'tally-num' + (i <= rightScore ? ' scored' : '');
+        }
+    }
+
+    function updateTallyServer(leftServer, rightServer, leftIsServing) {
+        var $left  = $('#tallyServerLeft');
+        var $right = $('#tallyServerRight');
+
+        $left.toggleClass('is-serving', !!leftIsServing);
+        $right.toggleClass('is-serving', !leftIsServing);
+
+        $('#tallyServerNameLeft').text(leftServer  ? ('#' + leftServer.number + (leftServer.name ? ' ' + leftServer.name : '')) : '–');
+        $('#tallyServerNameRight').text(rightServer ? ('#' + rightServer.number + (rightServer.name ? ' ' + rightServer.name : '')) : '–');
+    }
+
+    // Read server info for a side from the rendered court DOM
+    function getServerFromDom(side) {
+        var halfId = side === 'left' ? '#leftHalf' : '#rightHalf';
+        var slot = $(halfId + ' .position-slot[data-position="1"]');
+        if (slot.hasClass('occupied')) {
+            var num  = slot.find('.slot-number').text().trim();
+            var name = slot.find('.slot-player-name').text().trim();
+            return { number: num, name: name };
+        }
+        return null;
+    }
+
+    // Extract server from a positions array (returned by score endpoint)
+    function getServerFromPositions(positions) {
+        if (!positions) return null;
+        for (var i = 0; i < positions.length; i++) {
+            if (positions[i].position === 1 && positions[i].player) {
+                return { number: positions[i].player.number, name: positions[i].player.name };
+            }
+        }
+        return null;
+    }
+
+    // Persist panel geometry in sessionStorage so it survives set-change reloads
+    function saveTallyPosition() {
+        try {
+            var $p = $('#scoreTallyPanel');
+            sessionStorage.setItem('tallyPanel', JSON.stringify({
+                left: $p.css('left'), top: $p.css('top'),
+                width: $p.outerWidth(), height: $p.outerHeight(),
+                minimised: tallyMinimised
+            }));
+        } catch(e) {}
+    }
+
+    function restoreTallyPosition() {
+        try {
+            var saved = JSON.parse(sessionStorage.getItem('tallyPanel') || 'null');
+            if (!saved) return;
+            var $p = $('#scoreTallyPanel');
+            // Remove initial centering transform before setting absolute offsets
+            $p.css({ transform: 'none', left: saved.left, top: saved.top });
+            if (saved.width)  $p.outerWidth(saved.width);
+            if (saved.height) $p.outerHeight(saved.height);
+            if (saved.minimised) {
+                tallyMinimised = false;  // toggleTallyContent will flip it
+                toggleTallyContent();
+            }
+        } catch(e) {}
+    }
+
+    // Minimise / expand toggle
+    window.toggleTallyContent = function () {
+        tallyMinimised = !tallyMinimised;
+        $('#tallyContent').toggle(!tallyMinimised);
+        $('#tallyMinBtn').text(tallyMinimised ? '+' : '−');
+        saveTallyPosition();
+    };
+
+    // Time-out dot click
+    window.tallyTimeoutClick = function (el) {
+        el.classList.toggle('used');
+    };
+
+    // Utility helpers
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function truncate(s, n) {
+        return s && s.length > n ? s.slice(0, n) + '\u2026' : s;
+    }
+
     // ── SignalR (listen for updates triggered by other operator windows) ──────
     function initSignalR() {
         var connection = new signalR.HubConnectionBuilder()
@@ -438,6 +637,7 @@
     $(document).ready(function () {
         initDragDrop();
         initSignalR();
+        initTallyPanel();
 
         // Set initial serving highlight on position 1
         var initServingLeft = homeTeamOnLeft ? homeIsServing : !homeIsServing;

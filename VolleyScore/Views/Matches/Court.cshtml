@@ -42,7 +42,8 @@
         awaySetsWon: @Model.AwaySetsWon,
         totalSets: @Model.TotalSets,
         homeScore: @Model.CurrentSet.HomeScore,
-        awayScore: @Model.CurrentSet.AwayScore
+        awayScore: @Model.CurrentSet.AwayScore,
+        initialScore: @Model.Match.InitialScore
     };
 </script>
 
@@ -266,6 +267,32 @@
                class="btn btn-dark toolbar-btn" target="_blank">
                 <i class="bi bi-display me-1"></i> Open Display Screen
             </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── Score Tally Panel (floating, draggable, resizable) ─────────────── -->
+<div id="scoreTallyPanel" class="score-tally-panel">
+    <div class="tally-handle" id="tallyHandle">
+        <span class="tally-title">Score Tally</span>
+        <div class="tally-handle-btns">
+            <button class="tally-handle-btn" id="tallyMinBtn" title="Minimize / Expand" onclick="toggleTallyContent()">−</button>
+        </div>
+    </div>
+    <div class="tally-content" id="tallyContent">
+        <table class="tally-table" id="tallyTable">
+            <!-- Populated by court.js initTallyPanel() -->
+        </table>
+        <div class="tally-server-row" id="tallyServerRow">
+            <div class="tally-server-cell" id="tallyServerLeft">
+                <span class="server-label">Server</span>
+                <span class="server-name" id="tallyServerNameLeft">–</span>
+            </div>
+            <div class="tally-server-sep"></div>
+            <div class="tally-server-cell" id="tallyServerRight">
+                <span class="server-label">Server</span>
+                <span class="server-name" id="tallyServerNameRight">–</span>
+            </div>
         </div>
     </div>
 </div>
