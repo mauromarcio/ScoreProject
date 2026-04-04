@@ -172,8 +172,16 @@ public class ScoreController : Controller
             }
 
             // ── Check for set win ─────────────────────────────────────────────
-            // Final/deciding set plays to 15; all others play to 25
-            int winThreshold = (match!.CurrentSetNumber >= match.MaxSets) ? 15 : 25;
+            // Deciding set (odd TotalSets > 1, last set) plays to 15.
+            // Even TotalSets (best-of-2 / best-of-4): all sets play to 25 — no tiebreaker.
+            // A SetCap (e.g. 21) caps the threshold for pool play.
+            bool isDecidingSet = match!.TotalSets % 2 == 1
+                                  && match.TotalSets > 1
+                                  && match.CurrentSetNumber == match.MaxSets;
+            int winThreshold = isDecidingSet ? 15 : 25;
+            if (match.SetCap.HasValue && match.SetCap.Value > 0)
+                winThreshold = Math.Min(winThreshold, match.SetCap.Value);
+
             int homeS = currentSet.HomeScore;
             int awayS = currentSet.AwayScore;
 
@@ -189,13 +197,21 @@ public class ScoreController : Controller
 
                 int homeSets = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId);
                 int awaySets = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId);
-                int setsToWin = match.SetsToWin;
 
-                if (homeSets >= setsToWin || awaySets >= setsToWin)
+                if (homeSets >= match.SetsToWin || awaySets >= match.SetsToWin)
                 {
+                    // Clear winner reached the required sets
                     match.Status = MatchStatus.Completed;
                     matchCompleted = true;
                     winnerName = homeWinsSet ? match.HomeTeam!.Name : match.AwayTeam!.Name;
+                }
+                else if (match.CurrentSetNumber >= match.MaxSets)
+                {
+                    // All sets played, no team reached SetsToWin (even-set draw).
+                    // Standings are computed from individual set results.
+                    match.Status = MatchStatus.Completed;
+                    matchCompleted = true;
+                    // winnerName stays null — the UI will show "Match complete" without a winner banner
                 }
                 else
                 {

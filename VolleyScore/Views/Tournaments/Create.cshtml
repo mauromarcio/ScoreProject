@@ -32,25 +32,32 @@
                 </div>
 
                 <div class="row g-3 mb-3">
-                    <div class="col-sm-4">
+                    <div class="col-sm-3">
                         <label asp-for="PoolSetsPerMatch" class="form-label fw-semibold">Sets / Pool Match</label>
                         <select asp-for="PoolSetsPerMatch" class="form-select">
                             <option value="1">1 Set</option>
-                            <option value="2" selected>2 Sets</option>
+                            <option value="2" selected>Best of 2</option>
                             <option value="3">Best of 3</option>
                             <option value="5">Best of 5</option>
                         </select>
+                        <div class="form-text" id="poolSetsHelp">Play all 2 sets, standings use sets won.</div>
                     </div>
-                    <div class="col-sm-4">
+                    <div class="col-sm-3">
+                        <label asp-for="PoolSetCap" class="form-label fw-semibold">Pool Set Cap <span class="text-muted fw-normal">(pts)</span></label>
+                        <input asp-for="PoolSetCap" type="number" class="form-control" min="0" max="50" placeholder="0 = no cap" />
+                        <div class="form-text">Max pts per set in pool play. 0 = standard 25/15.</div>
+                        <span asp-validation-for="PoolSetCap" class="text-danger small"></span>
+                    </div>
+                    <div class="col-sm-3">
                         <label asp-for="PlayoffSetsPerMatch" class="form-label fw-semibold">Sets / Playoff Match</label>
                         <select asp-for="PlayoffSetsPerMatch" class="form-select">
                             <option value="1">1 Set</option>
-                            <option value="2">2 Sets</option>
+                            <option value="2">Best of 2</option>
                             <option value="3" selected>Best of 3</option>
                             <option value="5">Best of 5</option>
                         </select>
                     </div>
-                    <div class="col-sm-4">
+                    <div class="col-sm-3">
                         <label asp-for="InitialScore" class="form-label fw-semibold">Initial Score</label>
                         <input asp-for="InitialScore" type="number" class="form-control" min="0" max="24" value="0" />
                         <div class="form-text">0 = standard</div>
@@ -100,6 +107,21 @@
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
     <script>
+        var poolSetsSelect = document.getElementById('PoolSetsPerMatch');
+        var poolSetsHelp   = document.getElementById('poolSetsHelp');
+        function updatePoolHelp() {
+            var n = parseInt(poolSetsSelect.value);
+            if (n % 2 === 0) {
+                poolSetsHelp.textContent = 'Play all ' + n + ' sets to cap/25 pts each. No tiebreaker – standings use sets won.';
+            } else if (n === 1) {
+                poolSetsHelp.textContent = 'Single set – first to reach cap/25 pts wins.';
+            } else {
+                poolSetsHelp.textContent = 'Best of ' + n + ' – first to win ' + (Math.floor(n/2)+1) + ' sets. Deciding set to cap/15 pts.';
+            }
+        }
+        poolSetsSelect.addEventListener('change', updatePoolHelp);
+        updatePoolHelp();
+
         var checks = document.querySelectorAll('.team-check');
         var badge  = document.getElementById('teamCountBadge');
         function updateCount() {

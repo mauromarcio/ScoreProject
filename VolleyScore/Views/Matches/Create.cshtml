@@ -57,7 +57,7 @@
                         <div class="form-check">
                             <input class="form-check-input" type="radio" asp-for="TotalSets"
                                    value="2" id="sets2" />
-                            <label class="form-check-label" for="sets2">2 Sets</label>
+                            <label class="form-check-label" for="sets2">Best of 2</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" asp-for="TotalSets"
@@ -119,11 +119,11 @@
                 var helpEl = document.getElementById('setsHelpText');
                 var setsToWin = Math.floor(n / 2) + 1;
                 if (n === 1) {
-                    helpEl.textContent = 'Single set match – winner of the set wins.';
+                    helpEl.textContent = 'Single set – play one full set to 25 pts, winner takes the match.';
                 } else if (n % 2 === 0) {
-                    helpEl.textContent = 'Play all ' + n + ' sets. First to ' + setsToWin + ' set wins (tiebreaker if tied).';
+                    helpEl.textContent = 'Play all ' + n + ' sets to 25 pts each (no tiebreaker). Standings use sets won and points.';
                 } else {
-                    helpEl.textContent = 'Best of ' + n + ' – first to win ' + setsToWin + ' sets wins the match.';
+                    helpEl.textContent = 'Best of ' + n + ' – first to win ' + setsToWin + ' sets wins. Deciding set plays to 15 pts.';
                 }
             });
         });

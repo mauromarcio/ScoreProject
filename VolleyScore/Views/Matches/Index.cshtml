@@ -2,23 +2,49 @@
 @model IEnumerable<VolleyScore.Models.Match>
 @{
     ViewData["Title"] = "Matches";
+    bool showDeleted = ViewBag.ShowDeleted == true;
 }
 
 <div class="container-fluid py-4 px-4">
-    <div class="d-flex align-items-center mb-4">
+    <div class="d-flex align-items-center mb-4 flex-wrap gap-2">
         <h2 class="mb-0"><i class="bi bi-trophy me-2 text-warning"></i>Matches</h2>
-        <a asp-action="Create" class="btn btn-primary ms-auto">
-            <i class="bi bi-plus-circle me-1"></i> New Match
-        </a>
+        <div class="ms-auto d-flex align-items-center gap-2">
+            @if (showDeleted)
+            {
+                <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-eye-slash me-1"></i> Hide Archived
+                </a>
+            }
+            else
+            {
+                <a asp-action="Index" asp-route-showDeleted="true" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-archive me-1"></i> Show Archived
+                </a>
+            }
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i> New Match
+            </a>
+        </div>
     </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
 
     @if (!Model.Any())
     {
         <div class="card">
             <div class="card-body text-center py-5 text-muted">
                 <i class="bi bi-calendar-x" style="font-size:2rem"></i>
-                <p class="mt-2">No matches created yet.</p>
-                <a asp-action="Create" class="btn btn-primary">Create First Match</a>
+                <p class="mt-2">@(showDeleted ? "No archived matches found." : "No matches created yet.")</p>
+                @if (!showDeleted)
+                {
+                    <a asp-action="Create" class="btn btn-primary">Create First Match</a>
+                }
             </div>
         </div>
     }
@@ -46,14 +72,21 @@
                                 var currentSet = m.Sets.FirstOrDefault(s => s.SetNumber == m.CurrentSetNumber);
                                 var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
                                 var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
-                                <tr>
-                                    <td><strong>@m.MatchReference</strong></td>
+                                var rowClass = m.IsDeleted ? "table-secondary text-decoration-line-through text-muted" : "";
+                                <tr class="@rowClass">
+                                    <td>
+                                        <strong>@m.MatchReference</strong>
+                                        @if (m.IsDeleted)
+                                        {
+                                            <span class="badge bg-secondary ms-1">Archived</span>
+                                        }
+                                    </td>
                                     <td>@m.HomeTeam?.Name</td>
                                     <td class="text-center">
                                         <span class="fw-bold text-success">@homeSets</span>
                                         <span class="text-muted mx-1">–</span>
                                         <span class="fw-bold text-primary">@awaySets</span>
-                                        <span class="text-muted small ms-1">(bo@m.TotalSets)</span>
+                                        <span class="text-muted small ms-1">(@m.TotalSets sets)</span>
                                     </td>
                                     <td>@m.AwayTeam?.Name</td>
                                     <td class="text-center">@m.CurrentSetNumber</td>
@@ -74,14 +107,33 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="d-flex gap-1 justify-content-center">
-                                            <a asp-action="Court" asp-route-id="@m.Id"
-                                               class="btn btn-sm btn-primary" title="Open Court">
-                                                <i class="bi bi-grid-3x3-gap"></i>
-                                            </a>
-                                            <a asp-controller="Score" asp-action="Display" asp-route-id="@m.Id"
-                                               class="btn btn-sm btn-outline-dark" title="Score Display" target="_blank">
-                                                <i class="bi bi-display"></i>
-                                            </a>
+                                            @if (!m.IsDeleted)
+                                            {
+                                                <a asp-action="Court" asp-route-id="@m.Id"
+                                                   class="btn btn-sm btn-primary" title="Open Court">
+                                                    <i class="bi bi-grid-3x3-gap"></i>
+                                                </a>
+                                                <a asp-controller="Score" asp-action="Display" asp-route-id="@m.Id"
+                                                   class="btn btn-sm btn-outline-dark" title="Score Display" target="_blank">
+                                                    <i class="bi bi-display"></i>
+                                                </a>
+                                                <form asp-action="SoftDelete" asp-route-id="@m.Id" method="post" class="d-inline"
+                                                      onsubmit="return confirm('Archive this match? It can be restored later.')">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Archive">
+                                                        <i class="bi bi-archive"></i>
+                                                    </button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <form asp-action="Restore" asp-route-id="@m.Id" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Restore">
+                                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                                    </button>
+                                                </form>
+                                            }
                                         </div>
                                     </td>
                                 </tr>

@@ -42,13 +42,14 @@ using (var scope = app.Services.CreateScope())
         // ── Safe schema upgrades for existing databases ───────────────────────
         // Add InitialScore column to Matches if it doesn't exist yet
         db.Database.ExecuteSqlRaw(@"
-            IF NOT EXISTS (
-                SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'InitialScore'
-            )
-            BEGIN
-                ALTER TABLE Matches ADD InitialScore INT NOT NULL DEFAULT 0
-            END
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'InitialScore')
+                ALTER TABLE Matches ADD InitialScore INT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'IsDeleted')
+                ALTER TABLE Matches ADD IsDeleted BIT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'DeletedAt')
+                ALTER TABLE Matches ADD DeletedAt DATETIME2 NULL;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'SetCap')
+                ALTER TABLE Matches ADD SetCap INT NULL;
         ");
 
         // Create Tournament tables if they don't exist (EnsureCreated only creates
@@ -99,6 +100,8 @@ using (var scope = app.Services.CreateScope())
         db.Database.ExecuteSqlRaw(@"
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'PoolSetsPerMatch')
                 ALTER TABLE Tournaments ADD PoolSetsPerMatch INT NOT NULL DEFAULT 2;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'PoolSetCap')
+                ALTER TABLE Tournaments ADD PoolSetCap INT NULL;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'PlayoffSetsPerMatch')
                 ALTER TABLE Tournaments ADD PlayoffSetsPerMatch INT NOT NULL DEFAULT 3;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'Description')

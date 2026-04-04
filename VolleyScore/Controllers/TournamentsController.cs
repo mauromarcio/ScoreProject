@@ -142,6 +142,9 @@ public class TournamentsController : Controller
                 AwayTeamId = awayId,
                 TotalSets = tournament.PoolSetsPerMatch,
                 InitialScore = tournament.InitialScore,
+                SetCap = (tournament.PoolSetCap.HasValue && tournament.PoolSetCap.Value > 0)
+                             ? tournament.PoolSetCap
+                             : null,
                 Status = MatchStatus.Setup,
                 CurrentSetNumber = 1,
                 HomeTeamOnLeft = true,
@@ -320,13 +323,28 @@ public class TournamentsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(int id)
     {
-        var tournament = await _context.Tournaments.FindAsync(id);
+        var tournament = await _context.Tournaments
+            .Include(t => t.TournamentMatches)
+            .FirstOrDefaultAsync(t => t.Id == id);
         if (tournament == null) return NotFound();
+
+        // Soft-delete every match linked to this tournament before removing the tournament record
+        var matchIds = tournament.TournamentMatches.Select(tm => tm.MatchId).ToList();
+        var matches = await _context.Matches
+            .Where(m => matchIds.Contains(m.Id))
+            .ToListAsync();
+
+        foreach (var m in matches)
+        {
+            m.IsDeleted = true;
+            m.DeletedAt = DateTime.Now;
+        }
+        await _context.SaveChangesAsync();
 
         _context.Tournaments.Remove(tournament);
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = $"Tournament '{tournament.Name}' deleted.";
+        TempData["Success"] = $"Tournament '{tournament.Name}' deleted ({matches.Count} match(es) archived).";
         return RedirectToAction(nameof(Index));
     }
 

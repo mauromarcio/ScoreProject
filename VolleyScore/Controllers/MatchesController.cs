@@ -24,16 +24,53 @@ public class MatchesController : Controller
         _hubContext = hubContext;
     }
 
-    // GET: Matches
-    public async Task<IActionResult> Index()
+    // GET: Matches  [?showDeleted=true to include soft-deleted]
+    public async Task<IActionResult> Index(bool showDeleted = false)
     {
-        var matches = await _context.Matches
+        var query = _context.Matches
             .Include(m => m.HomeTeam)
             .Include(m => m.AwayTeam)
             .Include(m => m.Sets)
-            .OrderByDescending(m => m.CreatedAt)
-            .ToListAsync();
+            .AsQueryable();
+
+        if (!showDeleted)
+            query = query.Where(m => !m.IsDeleted);
+
+        var matches = await query.OrderByDescending(m => m.CreatedAt).ToListAsync();
+        ViewBag.ShowDeleted = showDeleted;
         return View(matches);
+    }
+
+    // POST: Matches/SoftDelete/5
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SoftDelete(int id)
+    {
+        var match = await _context.Matches.FindAsync(id);
+        if (match == null) return NotFound();
+
+        match.IsDeleted = true;
+        match.DeletedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        TempData["Success"] = $"Match '{match.MatchReference}' archived.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // POST: Matches/Restore/5
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restore(int id)
+    {
+        var match = await _context.Matches.FindAsync(id);
+        if (match == null) return NotFound();
+
+        match.IsDeleted = false;
+        match.DeletedAt = null;
+        await _context.SaveChangesAsync();
+
+        TempData["Success"] = $"Match '{match.MatchReference}' restored.";
+        return RedirectToAction(nameof(Index), new { showDeleted = true });
     }
 
     // GET: Matches/Create
@@ -93,7 +130,7 @@ public class MatchesController : Controller
             .Include(m => m.AwayTeam).ThenInclude(t => t!.Players)
             .Include(m => m.Sets)
             .Include(m => m.PlayerPositions).ThenInclude(pp => pp.Player)
-            .FirstOrDefaultAsync(m => m.Id == id);
+            .FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
 
         if (match == null) return NotFound();
 

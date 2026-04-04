@@ -33,6 +33,14 @@ public class Tournament
     [Display(Name = "Initial Score (Fair Play)")]
     public int InitialScore { get; set; } = 0;
 
+    /// <summary>
+    /// Point cap per set in pool play (0 or null = no cap, use standard 25/15).
+    /// E.g. 21 means a set ends as soon as a team reaches 21 with a 2-point lead.
+    /// </summary>
+    [Range(0, 50)]
+    [Display(Name = "Pool Set Cap (pts)")]
+    public int? PoolSetCap { get; set; }
+
     public TournamentStatus Status { get; set; } = TournamentStatus.Setup;
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;

@@ -45,6 +45,17 @@ public class Match
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
+    /// <summary>Soft delete — match is hidden from normal views but data is preserved</summary>
+    public bool IsDeleted { get; set; } = false;
+
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// Optional point cap per set (e.g. 21 for capped pool play).
+    /// Null or 0 = use standard thresholds (25 pts regular sets, 15 pts deciding set).
+    /// </summary>
+    public int? SetCap { get; set; }
+
     // Navigation properties
     [ForeignKey("HomeTeamId")]
     public Team? HomeTeam { get; set; }
@@ -62,7 +73,11 @@ public class Match
     public int AwaySetsWon => Sets.Count(s => s.WinnerTeamId == AwayTeamId);
     [NotMapped]
     public int SetsToWin => (TotalSets / 2) + 1;
-    /// <summary>Maximum possible sets: odd TotalSets stays the same; even TotalSets adds one tiebreaker</summary>
+    /// <summary>
+    /// Maximum sets to play. Always equals TotalSets.
+    /// Odd TotalSets (1,3,5) = best-of with deciding set; first to SetsToWin wins.
+    /// Even TotalSets (2,4)  = play all sets, standings based on sets won (no tiebreaker).
+    /// </summary>
     [NotMapped]
-    public int MaxSets => TotalSets % 2 == 0 ? TotalSets + 1 : TotalSets;
+    public int MaxSets => TotalSets;
 }
