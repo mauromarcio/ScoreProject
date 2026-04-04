@@ -172,7 +172,7 @@ public class TournamentsController : Controller
         tournament.Status = TournamentStatus.PoolPlay;
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = $"Generated {matchNumber - 1} pool matches.";
+        TempData["Success"] = $"Generated {schedule.Count} pool matches.";
         return RedirectToAction(nameof(PoolPlay), new { id });
     }
 
