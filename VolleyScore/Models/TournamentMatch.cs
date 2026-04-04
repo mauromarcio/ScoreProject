@@ -23,10 +23,16 @@ public class TournamentMatch
     /// </summary>
     public int MatchNumber { get; set; }
 
+    /// <summary>Pool matches only: the team assigned to referee this match.</summary>
+    public int? RefereeTeamId { get; set; }
+
     // Navigation
     [ForeignKey("TournamentId")]
     public Tournament? Tournament { get; set; }
 
     [ForeignKey("MatchId")]
     public Match? Match { get; set; }
+
+    [ForeignKey("RefereeTeamId")]
+    public Team? RefereeTeam { get; set; }
 }

@@ -121,53 +121,52 @@ public class TournamentsController : Controller
             return BadRequest(new { success = false, error = "Pool matches already exist." });
 
         var teams = tournament.TournamentTeams.OrderBy(tt => tt.SeedOrder).ToList();
-        int matchNumber = 1;
+        var teamLookup = teams.ToDictionary(tt => tt.TeamId, tt => tt.Team!);
+        var teamIds = teams.Select(tt => tt.TeamId).ToList();
 
-        // Round-robin: every team plays every other team once
-        for (int i = 0; i < teams.Count; i++)
+        // Build a schedule that assigns a referee to every match with these rules:
+        //  1. The team that just refereed cannot play in the very next match.
+        //  2. Among eligible options, schedule the teams that have waited longest first
+        //     (keeps consecutive "off" streaks to ≤ 2 for typical pool sizes).
+        var schedule = BuildPoolSchedule(teamIds);
+
+        for (int i = 0; i < schedule.Count; i++)
         {
-            for (int j = i + 1; j < teams.Count; j++)
+            var (homeId, awayId, refId) = schedule[i];
+            int matchNumber = i + 1;
+
+            var match = new Match
             {
-                var homeTeamId = teams[i].TeamId;
-                var awayTeamId = teams[j].TeamId;
-                var homeTeam = teams[i].Team!;
-                var awayTeam = teams[j].Team!;
+                MatchReference = $"{tournament.Name} – Pool {matchNumber}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}",
+                HomeTeamId = homeId,
+                AwayTeamId = awayId,
+                TotalSets = tournament.PoolSetsPerMatch,
+                InitialScore = tournament.InitialScore,
+                Status = MatchStatus.Setup,
+                CurrentSetNumber = 1,
+                HomeTeamOnLeft = true,
+                ServingTeamId = homeId
+            };
+            _context.Matches.Add(match);
+            await _context.SaveChangesAsync();
 
-                var match = new Match
-                {
-                    MatchReference = $"{tournament.Name} – Pool {matchNumber}: {homeTeam.Name} vs {awayTeam.Name}",
-                    HomeTeamId = homeTeamId,
-                    AwayTeamId = awayTeamId,
-                    TotalSets = tournament.PoolSetsPerMatch,
-                    InitialScore = tournament.InitialScore,
-                    Status = MatchStatus.Setup,
-                    CurrentSetNumber = 1,
-                    HomeTeamOnLeft = true,
-                    ServingTeamId = homeTeamId
-                };
-                _context.Matches.Add(match);
-                await _context.SaveChangesAsync();
+            _context.GameSets.Add(new GameSet
+            {
+                MatchId = match.Id,
+                SetNumber = 1,
+                HomeIsServing = true,
+                HomeScore = tournament.InitialScore,
+                AwayScore = tournament.InitialScore
+            });
 
-                // Create first set
-                _context.GameSets.Add(new GameSet
-                {
-                    MatchId = match.Id,
-                    SetNumber = 1,
-                    HomeIsServing = true,
-                    HomeScore = tournament.InitialScore,
-                    AwayScore = tournament.InitialScore
-                });
-
-                _context.TournamentMatches.Add(new TournamentMatch
-                {
-                    TournamentId = tournament.Id,
-                    MatchId = match.Id,
-                    Stage = TournamentStage.Pool,
-                    MatchNumber = matchNumber
-                });
-
-                matchNumber++;
-            }
+            _context.TournamentMatches.Add(new TournamentMatch
+            {
+                TournamentId = tournament.Id,
+                MatchId = match.Id,
+                Stage = TournamentStage.Pool,
+                MatchNumber = matchNumber,
+                RefereeTeamId = refId
+            });
         }
 
         tournament.Status = TournamentStatus.PoolPlay;
@@ -357,6 +356,7 @@ public class TournamentsController : Controller
             .Include(t => t.TournamentMatches).ThenInclude(tm => tm.Match!.HomeTeam)
             .Include(t => t.TournamentMatches).ThenInclude(tm => tm.Match!.AwayTeam)
             .Include(t => t.TournamentMatches).ThenInclude(tm => tm.Match!.Sets)
+            .Include(t => t.TournamentMatches).ThenInclude(tm => tm.RefereeTeam)
             .FirstOrDefaultAsync(t => t.Id == id);
     }
 
@@ -394,6 +394,65 @@ public class TournamentsController : Controller
             Stage = stage,
             MatchNumber = matchNumber
         });
+    }
+
+    /// <summary>
+    /// Builds an ordered pool-play schedule where every match has one referee team.
+    /// Rules enforced:
+    ///   1. The team that just refereed cannot PLAY in the immediately following match.
+    ///   2. At each step, the pair of teams that has waited longest (highest combined
+    ///      consecutive-off streak) is scheduled first — this keeps any team's gap
+    ///      between playing appearances to at most 2 matches in normal pool sizes.
+    /// Returns a list of (homeTeamId, awayTeamId, refereeTeamId) in scheduled order.
+    /// </summary>
+    private static List<(int home, int away, int referee)> BuildPoolSchedule(List<int> teamIds)
+    {
+        // Generate all unique pairs
+        var remaining = new List<(int a, int b)>();
+        for (int i = 0; i < teamIds.Count; i++)
+            for (int j = i + 1; j < teamIds.Count; j++)
+                remaining.Add((teamIds[i], teamIds[j]));
+
+        var result = new List<(int home, int away, int referee)>();
+        // Consecutive matches each team has not been a player (ref counts as off for this streak)
+        var offStreak = teamIds.ToDictionary(t => t, _ => 0);
+        int? prevRef = null;
+
+        while (remaining.Count > 0)
+        {
+            // Rule 1: skip any pair that would make the previous referee play
+            var candidates = prevRef.HasValue
+                ? remaining.Where(p => p.a != prevRef.Value && p.b != prevRef.Value).ToList()
+                : remaining.ToList();
+
+            // Edge case: if all remaining pairs involve prevRef (only possible with 3 teams at the
+            // very end), relax the constraint rather than getting stuck.
+            if (!candidates.Any())
+                candidates = remaining.ToList();
+
+            // Rule 2: pick the pair whose players have the largest combined waiting streak
+            var pick = candidates
+                .OrderByDescending(p => offStreak[p.a] + offStreak[p.b])
+                .ThenByDescending(p => Math.Max(offStreak[p.a], offStreak[p.b]))
+                .First();
+
+            remaining.Remove(pick);
+
+            // Referee: from non-playing teams, pick the one who has waited longest
+            int referee = teamIds
+                .Where(t => t != pick.a && t != pick.b)
+                .OrderByDescending(t => offStreak[t])
+                .First();
+
+            result.Add((pick.a, pick.b, referee));
+            prevRef = referee;
+
+            // Update streaks: players reset to 0, everyone else increments
+            foreach (var t in teamIds)
+                offStreak[t] = (t == pick.a || t == pick.b) ? 0 : offStreak[t] + 1;
+        }
+
+        return result;
     }
 
     /// <summary>

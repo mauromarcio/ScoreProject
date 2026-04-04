@@ -115,6 +115,8 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE TournamentMatches ADD Stage INT NOT NULL DEFAULT 0;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'MatchNumber')
                 ALTER TABLE TournamentMatches ADD MatchNumber INT NOT NULL DEFAULT 1;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'RefereeTeamId')
+                ALTER TABLE TournamentMatches ADD RefereeTeamId INT NULL REFERENCES Teams(Id);
         ");
     }
     catch (Exception ex)

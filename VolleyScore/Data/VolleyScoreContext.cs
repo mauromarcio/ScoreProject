@@ -127,6 +127,11 @@ public class VolleyScoreContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.MatchId)
                   .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.RefereeTeam)
+                  .WithMany()
+                  .HasForeignKey(e => e.RefereeTeamId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
         });
     }
 }
