@@ -398,58 +398,73 @@ public class TournamentsController : Controller
 
     /// <summary>
     /// Builds an ordered pool-play schedule where every match has one referee team.
-    /// Rules enforced:
-    ///   1. The team that just refereed cannot PLAY in the immediately following match.
-    ///   2. At each step, the pair of teams that has waited longest (highest combined
-    ///      consecutive-off streak) is scheduled first — this keeps any team's gap
-    ///      between playing appearances to at most 2 matches in normal pool sizes.
-    /// Returns a list of (homeTeamId, awayTeamId, refereeTeamId) in scheduled order.
+    ///
+    /// Two-phase approach:
+    ///   Phase 1 – Order matches: teams that have waited the longest play first,
+    ///             keeping each team's gap between playing appearances ≤ 2.
+    ///   Phase 2 – Assign referees: for each match the referee must not be one of
+    ///             the two players AND must not be a team playing in the NEXT match
+    ///             (so they get a rest after reffing and never ref right before they
+    ///             play). Among valid candidates the team with the fewest referee
+    ///             assignments so far is chosen, distributing duties evenly.
     /// </summary>
     private static List<(int home, int away, int referee)> BuildPoolSchedule(List<int> teamIds)
     {
-        // Generate all unique pairs
+        // ── Phase 1: determine match order ────────────────────────────────────
         var remaining = new List<(int a, int b)>();
         for (int i = 0; i < teamIds.Count; i++)
             for (int j = i + 1; j < teamIds.Count; j++)
                 remaining.Add((teamIds[i], teamIds[j]));
 
-        var result = new List<(int home, int away, int referee)>();
-        // Consecutive matches each team has not been a player (ref counts as off for this streak)
+        var orderedPairs = new List<(int a, int b)>();
         var offStreak = teamIds.ToDictionary(t => t, _ => 0);
-        int? prevRef = null;
 
         while (remaining.Count > 0)
         {
-            // Rule 1: skip any pair that would make the previous referee play
-            var candidates = prevRef.HasValue
-                ? remaining.Where(p => p.a != prevRef.Value && p.b != prevRef.Value).ToList()
-                : remaining.ToList();
-
-            // Edge case: if all remaining pairs involve prevRef (only possible with 3 teams at the
-            // very end), relax the constraint rather than getting stuck.
-            if (!candidates.Any())
-                candidates = remaining.ToList();
-
-            // Rule 2: pick the pair whose players have the largest combined waiting streak
-            var pick = candidates
+            // Pick the pair whose two players have waited the longest combined
+            var pick = remaining
                 .OrderByDescending(p => offStreak[p.a] + offStreak[p.b])
                 .ThenByDescending(p => Math.Max(offStreak[p.a], offStreak[p.b]))
                 .First();
 
             remaining.Remove(pick);
+            orderedPairs.Add(pick);
 
-            // Referee: from non-playing teams, pick the one who has waited longest
-            int referee = teamIds
-                .Where(t => t != pick.a && t != pick.b)
-                .OrderByDescending(t => offStreak[t])
-                .First();
-
-            result.Add((pick.a, pick.b, referee));
-            prevRef = referee;
-
-            // Update streaks: players reset to 0, everyone else increments
             foreach (var t in teamIds)
                 offStreak[t] = (t == pick.a || t == pick.b) ? 0 : offStreak[t] + 1;
+        }
+
+        // ── Phase 2: assign referees with even distribution ───────────────────
+        var refCount = teamIds.ToDictionary(t => t, _ => 0);
+        var result = new List<(int home, int away, int referee)>();
+
+        for (int i = 0; i < orderedPairs.Count; i++)
+        {
+            var (a, b) = orderedPairs[i];
+
+            // Teams playing in the NEXT match must not ref this match —
+            // this guarantees every referee gets a rest before their next game.
+            var nextPlayers = i + 1 < orderedPairs.Count
+                ? new HashSet<int> { orderedPairs[i + 1].a, orderedPairs[i + 1].b }
+                : new HashSet<int>();
+
+            var valid = teamIds
+                .Where(t => t != a && t != b && !nextPlayers.Contains(t))
+                .ToList();
+
+            // Fallback: for very small pools (3–4 teams) the constraint cannot always
+            // hold; relax to "just not playing in this match".
+            if (!valid.Any())
+                valid = teamIds.Where(t => t != a && t != b).ToList();
+
+            // Pick the team with fewest ref assignments; break ties by highest off-streak
+            int referee = valid
+                .OrderBy(t => refCount[t])
+                .ThenByDescending(t => offStreak[t])  // offStreak still tracks play gaps
+                .First();
+
+            refCount[referee]++;
+            result.Add((a, b, referee));
         }
 
         return result;
