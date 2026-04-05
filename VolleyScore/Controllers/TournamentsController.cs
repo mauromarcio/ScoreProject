@@ -489,6 +489,21 @@ public class TournamentsController : Controller
         int maxLen = courtQueues.Max(q => q.Count);
         for (int matchIdx = 0; matchIdx < maxLen; matchIdx++)
         {
+            // All teams playing on ANY court at this slot — they cannot ref any court simultaneously.
+            var playingAtSlot = new HashSet<int>();
+            for (int c = 0; c < numCourts; c++)
+            {
+                if (matchIdx < courtQueues[c].Count)
+                {
+                    var (pa, pb) = courtQueues[c][matchIdx];
+                    playingAtSlot.Add(pa);
+                    playingAtSlot.Add(pb);
+                }
+            }
+
+            // Track refs already assigned at this slot so no team refs two courts at once.
+            var refsAtSlot = new HashSet<int>();
+
             for (int c = 0; c < numCourts; c++)
             {
                 var pairs = courtQueues[c];
@@ -502,26 +517,40 @@ public class TournamentsController : Controller
 
                 int prevRef = lastRefPerCourt[c];
 
-                // Full constraints: not playing, not playing next, not just reffed here
+                // Full constraints:
+                //   • not playing on any court at this slot (covers current a/b + other courts)
+                //   • not already reffing another court at this slot
+                //   • not playing next on this court
+                //   • not just reffed this court (avoid consecutive)
                 var valid = allTeamIds
-                    .Where(t => t != a && t != b
+                    .Where(t => !playingAtSlot.Contains(t)
+                             && !refsAtSlot.Contains(t)
                              && !nextPlayers.Contains(t)
                              && (prevRef == 0 || t != prevRef))
                     .ToList();
 
-                // Fallback 1: allow the previous ref to repeat (still blocks next players)
+                // Fallback 1: allow the previous ref to repeat (still blocks cross-slot conflicts)
                 if (!valid.Any())
                     valid = allTeamIds
-                        .Where(t => t != a && t != b && !nextPlayers.Contains(t))
+                        .Where(t => !playingAtSlot.Contains(t)
+                                 && !refsAtSlot.Contains(t)
+                                 && !nextPlayers.Contains(t))
                         .ToList();
 
-                // Fallback 2: only block current players (last resort for tiny pools)
+                // Fallback 2: relax next-player constraint too
+                if (!valid.Any())
+                    valid = allTeamIds
+                        .Where(t => !playingAtSlot.Contains(t) && !refsAtSlot.Contains(t))
+                        .ToList();
+
+                // Fallback 3: last resort — only block current players on this court
                 if (!valid.Any())
                     valid = allTeamIds.Where(t => t != a && t != b).ToList();
 
                 int referee = valid.OrderBy(t => refCount[t]).ThenBy(t => t).First();
                 refCount[referee]++;
                 lastRefPerCourt[c] = referee;
+                refsAtSlot.Add(referee);
                 result.Add((a, b, referee, c + 1));
             }
         }
