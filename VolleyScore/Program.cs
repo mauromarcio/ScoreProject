@@ -120,6 +120,12 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE TournamentMatches ADD MatchNumber INT NOT NULL DEFAULT 1;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'RefereeTeamId')
                 ALTER TABLE TournamentMatches ADD RefereeTeamId INT NULL REFERENCES Teams(Id);
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'CourtNumber')
+                ALTER TABLE TournamentMatches ADD CourtNumber INT NOT NULL DEFAULT 1;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentTeams' AND COLUMN_NAME = 'CourtNumber')
+                ALTER TABLE TournamentTeams ADD CourtNumber INT NOT NULL DEFAULT 1;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'NumberOfCourts')
+                ALTER TABLE Tournaments ADD NumberOfCourts INT NOT NULL DEFAULT 1;
         ");
     }
     catch (Exception ex)

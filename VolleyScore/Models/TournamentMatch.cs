@@ -26,6 +26,9 @@ public class TournamentMatch
     /// <summary>Pool matches only: the team assigned to referee this match.</summary>
     public int? RefereeTeamId { get; set; }
 
+    /// <summary>Court number this match is played on (pool play only; 1 when not multi-court)</summary>
+    public int CourtNumber { get; set; } = 1;
+
     // Navigation
     [ForeignKey("TournamentId")]
     public Tournament? Tournament { get; set; }

@@ -16,6 +16,9 @@ public class TournamentTeam
     /// <summary>Display/seed order in the pool (1-based, user can reorder)</summary>
     public int SeedOrder { get; set; }
 
+    /// <summary>Court this team is assigned to (assigned when pool matches are generated)</summary>
+    public int CourtNumber { get; set; } = 1;
+
     // Navigation
     [ForeignKey("TournamentId")]
     public Tournament? Tournament { get; set; }

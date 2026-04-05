@@ -5,6 +5,14 @@
     ViewData["Title"] = Model.Tournament.Name + " – Pool Play";
     var completedCount = Model.PoolMatches.Count(m => m.Match?.Status == MatchStatus.Completed);
     var totalCount     = Model.PoolMatches.Count;
+    int numCourts      = Math.Max(1, Model.Tournament.NumberOfCourts);
+
+    // Group pool matches by court (court 0 = matches created before multi-court was introduced → show as court 1)
+    var courtGroups = Model.PoolMatches
+        .GroupBy(tm => tm.CourtNumber == 0 ? 1 : tm.CourtNumber)
+        .OrderBy(g => g.Key)
+        .ToList();
+    bool multiCourt = courtGroups.Count > 1;
 }
 
 <div class="container py-4">
@@ -37,7 +45,7 @@
 
     <div class="row g-4">
 
-        <!-- Standings -->
+        <!-- Standings (always global) -->
         <div class="col-lg-5">
             <div class="card">
                 <div class="card-header"><strong>Standings</strong></div>
@@ -47,6 +55,10 @@
                             <tr>
                                 <th>#</th>
                                 <th>Team</th>
+                                @if (multiCourt)
+                                {
+                                    <th class="text-center" title="Court">Ct</th>
+                                }
                                 <th class="text-center" title="Sets Won">SW</th>
                                 <th class="text-center" title="Points Made">PM</th>
                                 <th class="text-center" title="Points Against">PA</th>
@@ -62,6 +74,12 @@
                                 <tr class="@rowClass">
                                     <td class="fw-bold">@(i + 1)</td>
                                     <td>@s.TeamName</td>
+                                    @if (multiCourt)
+                                    {
+                                        <td class="text-center">
+                                            <span class="badge bg-primary">@s.CourtNumber</span>
+                                        </td>
+                                    }
                                     <td class="text-center fw-bold">@s.SetsWon</td>
                                     <td class="text-center">@s.PointsMade</td>
                                     <td class="text-center">@s.PointsAgainst</td>
@@ -77,6 +95,7 @@
                 </div>
                 <div class="card-footer text-muted small">
                     SW = Sets Won &nbsp;|&nbsp; PM = Points Made &nbsp;|&nbsp; PA = Points Against
+                    @if (multiCourt) { <span>&nbsp;|&nbsp; Ct = Court</span> }
                 </div>
             </div>
 
@@ -104,62 +123,45 @@
             }
         </div>
 
-        <!-- Match List -->
+        <!-- Match List — tabbed by court when multi-court -->
         <div class="col-lg-7">
-            <div class="card">
-                <div class="card-header"><strong>Pool Matches</strong></div>
-                <div class="list-group list-group-flush">
-                    @foreach (var tm in Model.PoolMatches)
+            @if (multiCourt)
+            {
+                <!-- Court tabs -->
+                <ul class="nav nav-tabs mb-0" id="courtTabs" role="tablist">
+                    @foreach (var cg in courtGroups)
                     {
-                        var m = tm.Match;
-                        if (m == null) continue;
-                        var statusClass = m.Status == MatchStatus.Completed ? "success" :
-                                          m.Status == MatchStatus.InProgress ? "warning" : "secondary";
-                        var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
-                        var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
-                        <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
-                           class="list-group-item list-group-item-action">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <span class="text-muted me-1 small">#@tm.MatchNumber</span>
-                                    <span class="fw-semibold">@m.HomeTeam?.Name</span>
-                                    <span class="text-muted mx-2">vs</span>
-                                    <span class="fw-semibold">@m.AwayTeam?.Name</span>
-                                </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    @if (m.Status == MatchStatus.Completed)
-                                    {
-                                        <span class="fw-bold">@homeSets – @awaySets</span>
-                                    }
-                                    <span class="badge bg-@statusClass">@m.Status</span>
-                                </div>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mt-1">
-                                @if (tm.RefereeTeam != null)
-                                {
-                                    <span class="small text-muted">
-                                        <i class="bi bi-whistle me-1"></i>Referee: <strong>@tm.RefereeTeam.Name</strong>
-                                    </span>
-                                }
-                                else { <span></span> }
-                                @if (m.Status == MatchStatus.Completed)
-                                {
-                                    <span class="text-muted small">
-                                        @string.Join("  |  ", m.Sets.OrderBy(s => s.SetNumber)
-                                            .Select(s => $"Set {s.SetNumber}: {s.HomeScore}–{s.AwayScore}"))
-                                    </span>
-                                }
-                            </div>
-                        </a>
+                        var done  = cg.Count(m => m.Match?.Status == MatchStatus.Completed);
+                        var total = cg.Count();
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(cg.Key == courtGroups.First().Key ? "active" : "")"
+                                    id="tab-court-@cg.Key"
+                                    data-bs-toggle="tab"
+                                    data-bs-target="#pane-court-@cg.Key"
+                                    type="button" role="tab">
+                                Court @cg.Key
+                                <span class="badge @(done == total ? "bg-success" : "bg-secondary") ms-1">@done/@total</span>
+                            </button>
+                        </li>
                     }
-                    @if (!Model.PoolMatches.Any())
+                </ul>
+                <div class="tab-content border border-top-0 rounded-bottom" id="courtTabContent">
+                    @foreach (var cg in courtGroups)
                     {
-                        <div class="list-group-item text-muted text-center py-4">
-                            No pool matches yet.
+                        <div class="tab-pane fade @(cg.Key == courtGroups.First().Key ? "show active" : "")"
+                             id="pane-court-@cg.Key" role="tabpanel">
+                            @await Html.PartialAsync("_PoolMatchList", cg.OrderBy(m => m.MatchNumber).ToList())
                         </div>
                     }
                 </div>
-            </div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="card-header"><strong>Pool Matches</strong></div>
+                    @await Html.PartialAsync("_PoolMatchList", Model.PoolMatches)
+                </div>
+            }
         </div>
 
     </div>

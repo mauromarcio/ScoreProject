@@ -11,6 +11,7 @@ public class TeamStanding
     public int TeamId { get; set; }
     public string TeamName { get; set; } = string.Empty;
     public int SeedOrder { get; set; }
+    public int CourtNumber { get; set; } = 1;
     public int MatchesPlayed { get; set; }
     public int SetsWon { get; set; }
     public int PointsMade { get; set; }

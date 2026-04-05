@@ -3,6 +3,17 @@
 @{
     ViewData["Title"] = Model.Name;
     var teams = Model.TournamentTeams.OrderBy(tt => tt.SeedOrder).ToList();
+    int numCourts = Math.Max(1, Model.NumberOfCourts);
+
+    // Interleaved court preview: position i (0-based) → court (i%numCourts)+1
+    var courtGroups = teams
+        .Select((tt, i) => new { tt, court = (i % numCourts) + 1 })
+        .GroupBy(x => x.court)
+        .OrderBy(g => g.Key)
+        .ToList();
+
+    // Expected total pool matches = sum of n*(n-1)/2 per court group
+    int expectedMatches = courtGroups.Sum(g => { int n = g.Count(); return n * (n - 1) / 2; });
 }
 
 <div class="container py-4" style="max-width:720px">
@@ -38,7 +49,7 @@
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-sm-4">
+        <div class="col-6 col-sm-3">
             <div class="card text-center">
                 <div class="card-body py-3">
                     <div class="fs-2 fw-bold text-primary">@teams.Count</div>
@@ -46,7 +57,15 @@
                 </div>
             </div>
         </div>
-        <div class="col-sm-4">
+        <div class="col-6 col-sm-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <div class="fs-2 fw-bold text-info">@numCourts</div>
+                    <div class="small text-muted">Court@(numCourts > 1 ? "s" : "")</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-3">
             <div class="card text-center">
                 <div class="card-body py-3">
                     <div class="fs-2 fw-bold text-success">@Model.PoolSetsPerMatch</div>
@@ -54,7 +73,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-sm-4">
+        <div class="col-6 col-sm-3">
             <div class="card text-center">
                 <div class="card-body py-3">
                     <div class="fs-2 fw-bold text-warning">@Model.PlayoffSetsPerMatch</div>
@@ -64,6 +83,42 @@
         </div>
     </div>
 
+    @* Court assignment preview — only shown in Setup before matches are generated *@
+    @if (Model.Status == TournamentStatus.Setup && numCourts > 1 && teams.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Court Assignment Preview</strong>
+                <span class="text-muted small ms-2">based on current seed order (interleaved)</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    @foreach (var group in courtGroups)
+                    {
+                        int n = group.Count();
+                        int matches = n * (n - 1) / 2;
+                        <div class="col-sm-6 col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white py-1 small fw-bold">
+                                    Court @group.Key &nbsp;·&nbsp; @n teams &nbsp;·&nbsp; @matches matches
+                                </div>
+                                <ul class="list-group list-group-flush">
+                                    @foreach (var x in group.OrderBy(g => g.tt.SeedOrder))
+                                    {
+                                        <li class="list-group-item py-1 small">
+                                            <span class="badge bg-secondary me-1">@x.tt.SeedOrder</span>
+                                            @x.tt.Team?.Name
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
     <!-- Teams with drag-to-reorder -->
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -71,13 +126,17 @@
             <span class="text-muted small">Drag to reorder seeding</span>
         </div>
         <ul class="list-group list-group-flush" id="teamSortList">
-            @foreach (var tt in teams)
+            @foreach (var x in teams.Select((tt, i) => new { tt, court = (i % numCourts) + 1 }))
             {
                 <li class="list-group-item d-flex align-items-center gap-3 sortable-item"
-                    data-team-id="@tt.TeamId">
+                    data-team-id="@x.tt.TeamId">
                     <i class="bi bi-grip-vertical text-muted" style="cursor:grab"></i>
-                    <span class="badge bg-secondary seed-badge">@tt.SeedOrder</span>
-                    <span class="fw-semibold">@tt.Team?.Name</span>
+                    <span class="badge bg-secondary seed-badge">@x.tt.SeedOrder</span>
+                    @if (numCourts > 1)
+                    {
+                        <span class="badge bg-primary court-badge">C@x.court</span>
+                    }
+                    <span class="fw-semibold">@x.tt.Team?.Name</span>
                 </li>
             }
         </ul>
@@ -92,7 +151,7 @@
         {
             <form asp-action="GeneratePoolMatches" asp-route-id="@Model.Id" method="post">
                 <button type="submit" class="btn btn-success"
-                        onclick="return confirm('Generate all @(teams.Count * (teams.Count - 1) / 2) pool matches?')">
+                        onclick="return confirm('Generate @expectedMatches pool match@(expectedMatches != 1 ? "es" : "") across @numCourts court@(numCourts > 1 ? "s" : "")?')">
                     <i class="bi bi-play-fill me-1"></i> Generate Pool Matches
                 </button>
             </form>
@@ -138,19 +197,22 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
     var tournamentId = @Model.Id;
-    var sortList = document.getElementById('teamSortList');
-    var statusEl = document.getElementById('reorderStatus');
-    var saveTimer = null;
+    var numCourts    = @numCourts;
+    var sortList     = document.getElementById('teamSortList');
+    var statusEl     = document.getElementById('reorderStatus');
+    var saveTimer    = null;
 
     Sortable.create(sortList, {
         animation: 150,
         handle: '.bi-grip-vertical',
         onEnd: function () {
-            // Update seed badges
             sortList.querySelectorAll('.sortable-item').forEach(function(el, idx) {
+                // Seed badge
                 el.querySelector('.seed-badge').textContent = idx + 1;
+                // Court badge (only present when numCourts > 1)
+                var cb = el.querySelector('.court-badge');
+                if (cb) cb.textContent = 'C' + ((idx % numCourts) + 1);
             });
-            // Debounce save
             clearTimeout(saveTimer);
             saveTimer = setTimeout(saveOrder, 600);
         }

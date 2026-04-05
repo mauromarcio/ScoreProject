@@ -41,6 +41,11 @@ public class Tournament
     [Display(Name = "Pool Set Cap (pts)")]
     public int? PoolSetCap { get; set; }
 
+    /// <summary>Number of simultaneous courts used for pool play (1–10).</summary>
+    [Range(1, 10)]
+    [Display(Name = "Number of Courts")]
+    public int NumberOfCourts { get; set; } = 1;
+
     public TournamentStatus Status { get; set; } = TournamentStatus.Setup;
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;

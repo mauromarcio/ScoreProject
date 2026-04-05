@@ -82,25 +82,34 @@ public class TournamentsController : Controller
     }
 
     // POST: Tournaments/ReorderTeams
-    // Saves user-reordered pool seed positions (drag-drop)
+    // Saves user-reordered pool seed positions (drag-drop) and recomputes court assignments
     [HttpPost]
     public async Task<IActionResult> ReorderTeams([FromBody] ReorderTeamsRequest req)
     {
         if (req?.TeamIds == null || req.TeamIds.Length == 0)
             return BadRequest(new { success = false });
 
+        var tournament = await _context.Tournaments.FindAsync(req.TournamentId);
+        if (tournament == null) return BadRequest(new { success = false });
+
         var ttEntries = await _context.TournamentTeams
             .Where(tt => tt.TournamentId == req.TournamentId)
             .ToListAsync();
 
+        int courts = Math.Max(1, tournament.NumberOfCourts);
+
         for (int i = 0; i < req.TeamIds.Length; i++)
         {
             var tt = ttEntries.FirstOrDefault(t => t.TeamId == req.TeamIds[i]);
-            if (tt != null) tt.SeedOrder = i + 1;
+            if (tt != null)
+            {
+                tt.SeedOrder = i + 1;
+                tt.CourtNumber = (i % courts) + 1;
+            }
         }
 
         await _context.SaveChangesAsync();
-        return Ok(new { success = true });
+        return Ok(new { success = true, courts = courts });
     }
 
     // POST: Tournaments/GeneratePoolMatches/5
@@ -122,60 +131,79 @@ public class TournamentsController : Controller
 
         var teams = tournament.TournamentTeams.OrderBy(tt => tt.SeedOrder).ToList();
         var teamLookup = teams.ToDictionary(tt => tt.TeamId, tt => tt.Team!);
-        var teamIds = teams.Select(tt => tt.TeamId).ToList();
+        int courts = Math.Max(1, tournament.NumberOfCourts);
 
-        // Build a schedule that assigns a referee to every match with these rules:
-        //  1. The team that just refereed cannot play in the very next match.
-        //  2. Among eligible options, schedule the teams that have waited longest first
-        //     (keeps consecutive "off" streaks to ≤ 2 for typical pool sizes).
-        var schedule = BuildPoolSchedule(teamIds);
+        // ── Assign teams to courts using interleaved seeding ─────────────────
+        // Position i (0-based) → court (i % courts) + 1
+        // e.g. 6 teams, 2 courts: seeds 1,3,5 → court 1 ; seeds 2,4,6 → court 2
+        for (int i = 0; i < teams.Count; i++)
+            teams[i].CourtNumber = (i % courts) + 1;
 
-        for (int i = 0; i < schedule.Count; i++)
+        // ── Build a per-court schedule and generate matches ───────────────────
+        int globalMatchNumber = 1;
+        int totalGenerated = 0;
+
+        for (int court = 1; court <= courts; court++)
         {
-            var (homeId, awayId, refId) = schedule[i];
-            int matchNumber = i + 1;
+            var courtTeams = teams.Where(tt => tt.CourtNumber == court).ToList();
+            if (courtTeams.Count < 2) continue;   // skip empty/single-team courts
 
-            var match = new Match
-            {
-                MatchReference = $"{tournament.Name} – Pool {matchNumber}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}",
-                HomeTeamId = homeId,
-                AwayTeamId = awayId,
-                TotalSets = tournament.PoolSetsPerMatch,
-                InitialScore = tournament.InitialScore,
-                SetCap = (tournament.PoolSetCap.HasValue && tournament.PoolSetCap.Value > 0)
-                             ? tournament.PoolSetCap
-                             : null,
-                Status = MatchStatus.Setup,
-                CurrentSetNumber = 1,
-                HomeTeamOnLeft = true,
-                ServingTeamId = homeId
-            };
-            _context.Matches.Add(match);
-            await _context.SaveChangesAsync();
+            var courtTeamIds = courtTeams.Select(tt => tt.TeamId).ToList();
+            var schedule = BuildPoolSchedule(courtTeamIds);
 
-            _context.GameSets.Add(new GameSet
+            for (int i = 0; i < schedule.Count; i++)
             {
-                MatchId = match.Id,
-                SetNumber = 1,
-                HomeIsServing = true,
-                HomeScore = tournament.InitialScore,
-                AwayScore = tournament.InitialScore
-            });
+                var (homeId, awayId, refId) = schedule[i];
+                int matchNumber = globalMatchNumber++;
 
-            _context.TournamentMatches.Add(new TournamentMatch
-            {
-                TournamentId = tournament.Id,
-                MatchId = match.Id,
-                Stage = TournamentStage.Pool,
-                MatchNumber = matchNumber,
-                RefereeTeamId = refId
-            });
+                var match = new Match
+                {
+                    MatchReference = courts > 1
+                        ? $"{tournament.Name} – Court {court} · Pool {i + 1}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}"
+                        : $"{tournament.Name} – Pool {matchNumber}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}",
+                    HomeTeamId = homeId,
+                    AwayTeamId = awayId,
+                    TotalSets = tournament.PoolSetsPerMatch,
+                    InitialScore = tournament.InitialScore,
+                    SetCap = (tournament.PoolSetCap.HasValue && tournament.PoolSetCap.Value > 0)
+                                 ? tournament.PoolSetCap
+                                 : null,
+                    Status = MatchStatus.Setup,
+                    CurrentSetNumber = 1,
+                    HomeTeamOnLeft = true,
+                    ServingTeamId = homeId
+                };
+                _context.Matches.Add(match);
+                await _context.SaveChangesAsync();
+
+                _context.GameSets.Add(new GameSet
+                {
+                    MatchId = match.Id,
+                    SetNumber = 1,
+                    HomeIsServing = true,
+                    HomeScore = tournament.InitialScore,
+                    AwayScore = tournament.InitialScore
+                });
+
+                _context.TournamentMatches.Add(new TournamentMatch
+                {
+                    TournamentId = tournament.Id,
+                    MatchId = match.Id,
+                    Stage = TournamentStage.Pool,
+                    MatchNumber = matchNumber,
+                    RefereeTeamId = refId,
+                    CourtNumber = court
+                });
+
+                totalGenerated++;
+            }
         }
 
         tournament.Status = TournamentStatus.PoolPlay;
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = $"Generated {schedule.Count} pool matches.";
+        var courtDesc = courts > 1 ? $" across {courts} courts" : "";
+        TempData["Success"] = $"Generated {totalGenerated} pool matches{courtDesc}.";
         return RedirectToAction(nameof(PoolPlay), new { id });
     }
 
@@ -502,7 +530,8 @@ public class TournamentsController : Controller
             {
                 TeamId = tt.TeamId,
                 TeamName = tt.Team?.Name ?? "Unknown",
-                SeedOrder = tt.SeedOrder
+                SeedOrder = tt.SeedOrder,
+                CourtNumber = tt.CourtNumber
             };
         }
 
