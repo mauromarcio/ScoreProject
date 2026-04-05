@@ -469,32 +469,59 @@ public class TournamentsController : Controller
         for (int c = 0; c < numCourts; c++)
             courtQueues[c] = ReorderToAvoidConsecutive(courtQueues[c], allTeamIds);
 
-        // ── Step 3: Assign referees per court with even global distribution ───
-        // "Team playing NEXT on THIS court must not ref current match on this court."
-        var refCount = allTeamIds.ToDictionary(t => t, _ => 0);
-        var result = new List<(int home, int away, int referee, int court)>();
+        // ── Step 3: Assign referees — interleaved across courts, no consecutive slots ─
+        //
+        // Why interleaved?  Processing all of court 1 then all of court 2 lets one
+        // court drain the low-refCount pool before the others even start, creating
+        // imbalance.  Interleaving (c1m1 → c2m1 → c1m2 → c2m2 → …) keeps the
+        // global refCount fair at every step.
+        //
+        // Two extra constraints vs. before:
+        //  • A team playing in the NEXT match on this court cannot ref now.
+        //  • The team that just refereed on this court cannot ref again immediately
+        //    (tracked per court in lastRefPerCourt[]).
+        //
+        // Fallbacks relax constraints in order until a valid candidate is found.
+        var refCount        = allTeamIds.ToDictionary(t => t, _ => 0);
+        var lastRefPerCourt = new int[numCourts];   // 0 = no previous ref yet
+        var result          = new List<(int home, int away, int referee, int court)>();
 
-        for (int c = 0; c < numCourts; c++)
+        int maxLen = courtQueues.Max(q => q.Count);
+        for (int matchIdx = 0; matchIdx < maxLen; matchIdx++)
         {
-            var pairs = courtQueues[c];
-            for (int i = 0; i < pairs.Count; i++)
+            for (int c = 0; c < numCourts; c++)
             {
-                var (a, b) = pairs[i];
+                var pairs = courtQueues[c];
+                if (matchIdx >= pairs.Count) continue;
 
-                var nextPlayers = i + 1 < pairs.Count
-                    ? new HashSet<int> { pairs[i + 1].Item1, pairs[i + 1].Item2 }
+                var (a, b) = pairs[matchIdx];
+
+                var nextPlayers = matchIdx + 1 < pairs.Count
+                    ? new HashSet<int> { pairs[matchIdx + 1].Item1, pairs[matchIdx + 1].Item2 }
                     : new HashSet<int>();
 
+                int prevRef = lastRefPerCourt[c];
+
+                // Full constraints: not playing, not playing next, not just reffed here
                 var valid = allTeamIds
-                    .Where(t => t != a && t != b && !nextPlayers.Contains(t))
+                    .Where(t => t != a && t != b
+                             && !nextPlayers.Contains(t)
+                             && (prevRef == 0 || t != prevRef))
                     .ToList();
 
-                // Fallback for very small pools where constraint can't always hold
+                // Fallback 1: allow the previous ref to repeat (still blocks next players)
+                if (!valid.Any())
+                    valid = allTeamIds
+                        .Where(t => t != a && t != b && !nextPlayers.Contains(t))
+                        .ToList();
+
+                // Fallback 2: only block current players (last resort for tiny pools)
                 if (!valid.Any())
                     valid = allTeamIds.Where(t => t != a && t != b).ToList();
 
                 int referee = valid.OrderBy(t => refCount[t]).ThenBy(t => t).First();
                 refCount[referee]++;
+                lastRefPerCourt[c] = referee;
                 result.Add((a, b, referee, c + 1));
             }
         }
