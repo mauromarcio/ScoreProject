@@ -182,8 +182,6 @@ public class TournamentsController : Controller
         var courtDesc = courts > 1 ? $" distributed across {courts} courts" : "";
         TempData["Success"] = $"Generated {total} pool matches{courtDesc}.";
         return RedirectToAction(nameof(PoolPlay), new { id });
-        TempData["Success"] = $"Generated {totalGenerated} pool matches{courtDesc}.";
-        return RedirectToAction(nameof(PoolPlay), new { id });
     }
 
     // GET: Tournaments/PoolPlay/5
