@@ -1,0 +1,158 @@
+@* File: VolleyScore/Views/Tournaments/PoolPlayReport.cshtml *@
+@* Printable pool-play schedule grouped by court *@
+@model VolleyScore.ViewModels.TournamentPoolViewModel
+@using VolleyScore.Models
+@{
+    ViewData["Title"] = Model.Tournament.Name + " – Pool Schedule";
+    Layout = null; // standalone page — no nav chrome
+
+    int numCourts = Math.Max(1, Model.Tournament.NumberOfCourts);
+    bool multiCourt = numCourts > 1;
+
+    var courtGroups = Model.PoolMatches
+        .GroupBy(tm => tm.CourtNumber == 0 ? 1 : tm.CourtNumber)
+        .OrderBy(g => g.Key)
+        .ToList();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #000; background: #fff; padding: 16px; }
+
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .header h1 { font-size: 20px; font-weight: bold; }
+        .header .sub { font-size: 13px; color: #444; margin-top: 4px; }
+
+        .no-print { margin-bottom: 16px; }
+        .no-print button {
+            padding: 6px 18px; font-size: 13px; cursor: pointer;
+            background: #0d6efd; color: #fff; border: none; border-radius: 4px; margin-right: 8px;
+        }
+        .no-print a {
+            padding: 6px 18px; font-size: 13px; cursor: pointer;
+            background: #6c757d; color: #fff; border: none; border-radius: 4px;
+            text-decoration: none; display: inline-block;
+        }
+
+        .court-section { margin-bottom: 28px; page-break-inside: avoid; }
+        .court-title {
+            font-size: 15px; font-weight: bold;
+            background: #1a1a2e; color: #fff;
+            padding: 5px 10px; margin-bottom: 6px;
+            border-radius: 3px;
+        }
+        .court-title .badge { font-size: 11px; font-weight: normal; margin-left: 8px; opacity: .85; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+        thead tr { background: #eef; }
+        th, td { border: 1px solid #aaa; padding: 4px 7px; vertical-align: middle; }
+        th { font-weight: bold; text-align: center; }
+        .col-num  { width: 36px; text-align: center; }
+        .col-team { width: 22%; }
+        .col-vs   { width: 28px; text-align: center; color: #666; }
+        .col-ref  { width: 18%; color: #444; }
+        .col-res  { width: 80px; text-align: center; }
+        .col-set  { width: 55px; text-align: center; }
+        .col-sta  { width: 64px; text-align: center; }
+
+        .done td  { background: #f0f8f0; }
+        .set-score { font-size: 10px; color: #555; }
+
+        @@media print {
+            .no-print { display: none !important; }
+            body { padding: 8px; }
+            .court-section { page-break-after: always; }
+            .court-section:last-child { page-break-after: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="no-print">
+    <button onclick="window.print()">&#x1F5A8; Print</button>
+    <a href="/Tournaments/PoolPlay/@Model.Tournament.Id">← Back to Pool Play</a>
+</div>
+
+<div class="header">
+    <h1>@Model.Tournament.Name — Pool Play Schedule</h1>
+    <div class="sub">
+        @Model.Tournament.TournamentTeams.Count teams &nbsp;·&nbsp;
+        @Model.PoolMatches.Count matches
+        @if (multiCourt) { <text>&nbsp;·&nbsp; @numCourts courts (parallel play)</text> }
+        &nbsp;·&nbsp; @Model.PoolMatches.Count(m => m.Match?.Status == MatchStatus.Completed) completed
+    </div>
+</div>
+
+@foreach (var cg in courtGroups)
+{
+    var courtMatches = cg.OrderBy(m => m.MatchNumber).ToList();
+    int done  = courtMatches.Count(m => m.Match?.Status == MatchStatus.Completed);
+    int total = courtMatches.Count;
+
+    <div class="court-section">
+        <div class="court-title">
+            @(multiCourt ? $"Court {cg.Key}" : "Pool Matches")
+            <span class="badge">@done / @total completed</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-num">#</th>
+                    <th class="col-team">Home</th>
+                    <th class="col-vs">vs</th>
+                    <th class="col-team">Away</th>
+                    <th class="col-ref">Referee</th>
+                    <th class="col-set">Sets</th>
+                    <th class="col-res">Result</th>
+                    <th class="col-sta">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tm in courtMatches)
+                {
+                    var m = tm.Match;
+                    if (m == null) continue;
+                    bool completed = m.Status == MatchStatus.Completed;
+                    int homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                    int awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                    string rowClass = completed ? "done" : "";
+                    <tr class="@rowClass">
+                        <td class="col-num">@tm.MatchNumber</td>
+                        <td class="col-team">@m.HomeTeam?.Name</td>
+                        <td class="col-vs">vs</td>
+                        <td class="col-team">@m.AwayTeam?.Name</td>
+                        <td class="col-ref">@(tm.RefereeTeam?.Name ?? "—")</td>
+                        <td class="col-set">
+                            @if (completed)
+                            {
+                                <strong>@homeSets – @awaySets</strong>
+                            }
+                        </td>
+                        <td class="col-res">
+                            @if (completed)
+                            {
+                                <span class="set-score">
+                                    @string.Join(" | ", m.Sets.OrderBy(s => s.SetNumber)
+                                        .Select(s => $"{s.HomeScore}-{s.AwayScore}"))
+                                </span>
+                            }
+                        </td>
+                        <td class="col-sta">
+                            @(m.Status == MatchStatus.Completed ? "Done" :
+                              m.Status == MatchStatus.InProgress ? "Live" : "")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+</body>
+</html>

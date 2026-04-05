@@ -370,6 +370,14 @@ public class TournamentsController : Controller
         return View(vm);
     }
 
+    // GET: Tournaments/PoolPlayReport/5  – printable pool-play schedule grouped by court
+    public async Task<IActionResult> PoolPlayReport(int id)
+    {
+        var tournament = await LoadTournament(id);
+        if (tournament == null) return NotFound();
+        return View(BuildPoolViewModel(tournament));
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private async Task<Tournament?> LoadTournament(int id)
@@ -457,6 +465,10 @@ public class TournamentsController : Controller
                 courtQueues[byLoad[i % numCourts]].Add(round[i]);
         }
 
+        // ── Step 2b: Reorder each court's queue to avoid back-to-back appearances ─
+        for (int c = 0; c < numCourts; c++)
+            courtQueues[c] = ReorderToAvoidConsecutive(courtQueues[c], allTeamIds);
+
         // ── Step 3: Assign referees per court with even global distribution ───
         // "Team playing NEXT on THIS court must not ref current match on this court."
         var refCount = allTeamIds.ToDictionary(t => t, _ => 0);
@@ -533,6 +545,51 @@ public class TournamentsController : Controller
         }
 
         return rounds;
+    }
+
+    /// <summary>
+    /// Reorders a court's match list so that no team plays two matches in a row
+    /// on that court. Uses a greedy "longest-wait-first" approach: at each step,
+    /// skip any pair that shares a team with the previous match, then among valid
+    /// candidates pick the one whose players have waited the most. Falls back to
+    /// least-bad option if no fully valid candidate exists (unavoidable for very
+    /// small queues).
+    /// </summary>
+    private static List<(int a, int b)> ReorderToAvoidConsecutive(
+        List<(int a, int b)> pairs, List<int> allTeamIds)
+    {
+        if (pairs.Count <= 1) return pairs;
+
+        var remaining = new List<(int a, int b)>(pairs);
+        var result    = new List<(int a, int b)>();
+        var offStreak = allTeamIds.ToDictionary(t => t, _ => 0);
+        var lastTeams = new HashSet<int>();
+
+        while (remaining.Count > 0)
+        {
+            // Prefer pairs where neither team just played on this court
+            var candidates = remaining
+                .Where(p => !lastTeams.Contains(p.a) && !lastTeams.Contains(p.b))
+                .ToList();
+
+            // Fallback: if every remaining pair shares a player with the last match
+            if (!candidates.Any()) candidates = remaining.ToList();
+
+            // Among valid candidates, pick the pair whose players have waited longest
+            var pick = candidates
+                .OrderByDescending(p => offStreak[p.a] + offStreak[p.b])
+                .ThenByDescending(p => Math.Max(offStreak[p.a], offStreak[p.b]))
+                .First();
+
+            remaining.Remove(pick);
+            result.Add(pick);
+
+            lastTeams = new HashSet<int> { pick.a, pick.b };
+            foreach (var t in allTeamIds)
+                offStreak[t] = (t == pick.a || t == pick.b) ? 0 : offStreak[t] + 1;
+        }
+
+        return result;
     }
 
     /// <summary>

@@ -24,6 +24,10 @@
             <h2 class="mb-0">@Model.Tournament.Name – Pool Play</h2>
             <p class="text-muted mb-0 small">@completedCount / @totalCount matches completed</p>
         </div>
+        <a asp-action="PoolPlayReport" asp-route-id="@Model.Tournament.Id"
+           class="btn btn-outline-secondary btn-sm ms-2" target="_blank" title="Print pool schedule">
+            <i class="bi bi-printer me-1"></i> Print Schedule
+        </a>
         @if (Model.Tournament.Status == TournamentStatus.PoolPlay)
         {
             <form asp-action="GeneratePlayoffs" asp-route-id="@Model.Tournament.Id" method="post" class="ms-2">
