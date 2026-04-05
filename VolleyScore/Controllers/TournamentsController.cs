@@ -82,34 +82,25 @@ public class TournamentsController : Controller
     }
 
     // POST: Tournaments/ReorderTeams
-    // Saves user-reordered pool seed positions (drag-drop) and recomputes court assignments
+    // Saves user-reordered pool seed positions (drag-drop)
     [HttpPost]
     public async Task<IActionResult> ReorderTeams([FromBody] ReorderTeamsRequest req)
     {
         if (req?.TeamIds == null || req.TeamIds.Length == 0)
             return BadRequest(new { success = false });
 
-        var tournament = await _context.Tournaments.FindAsync(req.TournamentId);
-        if (tournament == null) return BadRequest(new { success = false });
-
         var ttEntries = await _context.TournamentTeams
             .Where(tt => tt.TournamentId == req.TournamentId)
             .ToListAsync();
 
-        int courts = Math.Max(1, tournament.NumberOfCourts);
-
         for (int i = 0; i < req.TeamIds.Length; i++)
         {
             var tt = ttEntries.FirstOrDefault(t => t.TeamId == req.TeamIds[i]);
-            if (tt != null)
-            {
-                tt.SeedOrder = i + 1;
-                tt.CourtNumber = (i % courts) + 1;
-            }
+            if (tt != null) tt.SeedOrder = i + 1;
         }
 
         await _context.SaveChangesAsync();
-        return Ok(new { success = true, courts = courts });
+        return Ok(new { success = true });
     }
 
     // POST: Tournaments/GeneratePoolMatches/5
@@ -131,78 +122,66 @@ public class TournamentsController : Controller
 
         var teams = tournament.TournamentTeams.OrderBy(tt => tt.SeedOrder).ToList();
         var teamLookup = teams.ToDictionary(tt => tt.TeamId, tt => tt.Team!);
+        var allTeamIds = teams.Select(tt => tt.TeamId).ToList();
         int courts = Math.Max(1, tournament.NumberOfCourts);
 
-        // ── Assign teams to courts using interleaved seeding ─────────────────
-        // Position i (0-based) → court (i % courts) + 1
-        // e.g. 6 teams, 2 courts: seeds 1,3,5 → court 1 ; seeds 2,4,6 → court 2
-        for (int i = 0; i < teams.Count; i++)
-            teams[i].CourtNumber = (i % courts) + 1;
+        // Full round-robin across ALL teams, distributed across courts for parallel play.
+        // Every team still plays every other team exactly once (N*(N-1)/2 total matches).
+        // Courts are purely organisational — they let multiple matches run in parallel.
+        var schedule = BuildMultiCourtSchedule(allTeamIds, courts);
 
-        // ── Build a per-court schedule and generate matches ───────────────────
-        int globalMatchNumber = 1;
-        int totalGenerated = 0;
-
-        for (int court = 1; court <= courts; court++)
+        int matchNumber = 1;
+        foreach (var (homeId, awayId, refId, courtNum) in schedule)
         {
-            var courtTeams = teams.Where(tt => tt.CourtNumber == court).ToList();
-            if (courtTeams.Count < 2) continue;   // skip empty/single-team courts
-
-            var courtTeamIds = courtTeams.Select(tt => tt.TeamId).ToList();
-            var schedule = BuildPoolSchedule(courtTeamIds);
-
-            for (int i = 0; i < schedule.Count; i++)
+            var match = new Match
             {
-                var (homeId, awayId, refId) = schedule[i];
-                int matchNumber = globalMatchNumber++;
+                MatchReference = courts > 1
+                    ? $"{tournament.Name} – C{courtNum}·{matchNumber}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}"
+                    : $"{tournament.Name} – Pool {matchNumber}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}",
+                HomeTeamId = homeId,
+                AwayTeamId = awayId,
+                TotalSets = tournament.PoolSetsPerMatch,
+                InitialScore = tournament.InitialScore,
+                SetCap = (tournament.PoolSetCap.HasValue && tournament.PoolSetCap.Value > 0)
+                             ? tournament.PoolSetCap
+                             : null,
+                Status = MatchStatus.Setup,
+                CurrentSetNumber = 1,
+                HomeTeamOnLeft = true,
+                ServingTeamId = homeId
+            };
+            _context.Matches.Add(match);
+            await _context.SaveChangesAsync();
 
-                var match = new Match
-                {
-                    MatchReference = courts > 1
-                        ? $"{tournament.Name} – Court {court} · Pool {i + 1}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}"
-                        : $"{tournament.Name} – Pool {matchNumber}: {teamLookup[homeId].Name} vs {teamLookup[awayId].Name}",
-                    HomeTeamId = homeId,
-                    AwayTeamId = awayId,
-                    TotalSets = tournament.PoolSetsPerMatch,
-                    InitialScore = tournament.InitialScore,
-                    SetCap = (tournament.PoolSetCap.HasValue && tournament.PoolSetCap.Value > 0)
-                                 ? tournament.PoolSetCap
-                                 : null,
-                    Status = MatchStatus.Setup,
-                    CurrentSetNumber = 1,
-                    HomeTeamOnLeft = true,
-                    ServingTeamId = homeId
-                };
-                _context.Matches.Add(match);
-                await _context.SaveChangesAsync();
+            _context.GameSets.Add(new GameSet
+            {
+                MatchId = match.Id,
+                SetNumber = 1,
+                HomeIsServing = true,
+                HomeScore = tournament.InitialScore,
+                AwayScore = tournament.InitialScore
+            });
 
-                _context.GameSets.Add(new GameSet
-                {
-                    MatchId = match.Id,
-                    SetNumber = 1,
-                    HomeIsServing = true,
-                    HomeScore = tournament.InitialScore,
-                    AwayScore = tournament.InitialScore
-                });
+            _context.TournamentMatches.Add(new TournamentMatch
+            {
+                TournamentId = tournament.Id,
+                MatchId = match.Id,
+                Stage = TournamentStage.Pool,
+                MatchNumber = matchNumber,
+                RefereeTeamId = refId,
+                CourtNumber = courtNum
+            });
 
-                _context.TournamentMatches.Add(new TournamentMatch
-                {
-                    TournamentId = tournament.Id,
-                    MatchId = match.Id,
-                    Stage = TournamentStage.Pool,
-                    MatchNumber = matchNumber,
-                    RefereeTeamId = refId,
-                    CourtNumber = court
-                });
-
-                totalGenerated++;
-            }
+            matchNumber++;
         }
 
         tournament.Status = TournamentStatus.PoolPlay;
         await _context.SaveChangesAsync();
 
-        var courtDesc = courts > 1 ? $" across {courts} courts" : "";
+        int total = schedule.Count;
+        var courtDesc = courts > 1 ? $" distributed across {courts} courts" : "";
+        TempData["Success"] = $"Generated {total} pool matches{courtDesc}.";
+        return RedirectToAction(nameof(PoolPlay), new { id });
         TempData["Success"] = $"Generated {totalGenerated} pool matches{courtDesc}.";
         return RedirectToAction(nameof(PoolPlay), new { id });
     }
@@ -444,76 +423,118 @@ public class TournamentsController : Controller
 
     /// <summary>
     /// Builds an ordered pool-play schedule where every match has one referee team.
+    /// Builds a full round-robin schedule for ALL teams, distributes the matches
+    /// across courts for parallel play, and assigns referees.
     ///
-    /// Two-phase approach:
-    ///   Phase 1 – Order matches: teams that have waited the longest play first,
-    ///             keeping each team's gap between playing appearances ≤ 2.
-    ///   Phase 2 – Assign referees: for each match the referee must not be one of
-    ///             the two players AND must not be a team playing in the NEXT match
-    ///             (so they get a rest after reffing and never ref right before they
-    ///             play). Among valid candidates the team with the fewest referee
-    ///             assignments so far is chosen, distributing duties evenly.
+    /// - Every team plays every other team exactly once (N*(N-1)/2 total matches).
+    /// - Courts are for time management only — multiple courts run their sequences
+    ///   in parallel so the tournament finishes faster.
+    /// - Match order per court is derived from the circle-method so no team plays
+    ///   two matches in the same "round" (no simultaneous conflicts).
+    /// - Referee rule (per court): the team playing NEXT on that court cannot ref
+    ///   the current match on that court.
+    /// - Referee assignments are distributed as evenly as possible across all teams.
     /// </summary>
-    private static List<(int home, int away, int referee)> BuildPoolSchedule(List<int> teamIds)
+    private static List<(int home, int away, int referee, int court)> BuildMultiCourtSchedule(
+        List<int> allTeamIds, int numCourts)
     {
-        // ── Phase 1: determine match order ────────────────────────────────────
-        var remaining = new List<(int a, int b)>();
-        for (int i = 0; i < teamIds.Count; i++)
-            for (int j = i + 1; j < teamIds.Count; j++)
-                remaining.Add((teamIds[i], teamIds[j]));
+        numCourts = Math.Max(1, numCourts);
 
-        var orderedPairs = new List<(int a, int b)>();
-        var offStreak = teamIds.ToDictionary(t => t, _ => 0);
+        // ── Step 1: Generate all rounds via the circle method ─────────────────
+        // Each round contains non-conflicting pairs (no team appears twice per round).
+        var rounds = GenerateRoundRobinRounds(allTeamIds);
 
-        while (remaining.Count > 0)
+        // ── Step 2: Distribute round matches across courts ────────────────────
+        // For each round, assign its matches to courts in rotation, always filling
+        // the court with the shortest current queue first (balances load).
+        var courtQueues = new List<List<(int a, int b)>>(numCourts);
+        for (int c = 0; c < numCourts; c++) courtQueues.Add(new List<(int, int)>());
+
+        foreach (var round in rounds)
         {
-            // Pick the pair whose two players have waited the longest combined
-            var pick = remaining
-                .OrderByDescending(p => offStreak[p.a] + offStreak[p.b])
-                .ThenByDescending(p => Math.Max(offStreak[p.a], offStreak[p.b]))
-                .First();
-
-            remaining.Remove(pick);
-            orderedPairs.Add(pick);
-
-            foreach (var t in teamIds)
-                offStreak[t] = (t == pick.a || t == pick.b) ? 0 : offStreak[t] + 1;
+            var byLoad = Enumerable.Range(0, numCourts)
+                .OrderBy(c => courtQueues[c].Count)
+                .ToList();
+            for (int i = 0; i < round.Count; i++)
+                courtQueues[byLoad[i % numCourts]].Add(round[i]);
         }
 
-        // ── Phase 2: assign referees with even distribution ───────────────────
-        var refCount = teamIds.ToDictionary(t => t, _ => 0);
-        var result = new List<(int home, int away, int referee)>();
+        // ── Step 3: Assign referees per court with even global distribution ───
+        // "Team playing NEXT on THIS court must not ref current match on this court."
+        var refCount = allTeamIds.ToDictionary(t => t, _ => 0);
+        var result = new List<(int home, int away, int referee, int court)>();
 
-        for (int i = 0; i < orderedPairs.Count; i++)
+        for (int c = 0; c < numCourts; c++)
         {
-            var (a, b) = orderedPairs[i];
+            var pairs = courtQueues[c];
+            for (int i = 0; i < pairs.Count; i++)
+            {
+                var (a, b) = pairs[i];
 
-            // Teams playing in the NEXT match must not ref this match —
-            // this guarantees every referee gets a rest before their next game.
-            var nextPlayers = i + 1 < orderedPairs.Count
-                ? new HashSet<int> { orderedPairs[i + 1].a, orderedPairs[i + 1].b }
-                : new HashSet<int>();
+                var nextPlayers = i + 1 < pairs.Count
+                    ? new HashSet<int> { pairs[i + 1].Item1, pairs[i + 1].Item2 }
+                    : new HashSet<int>();
 
-            var valid = teamIds
-                .Where(t => t != a && t != b && !nextPlayers.Contains(t))
-                .ToList();
+                var valid = allTeamIds
+                    .Where(t => t != a && t != b && !nextPlayers.Contains(t))
+                    .ToList();
 
-            // Fallback: for very small pools (3–4 teams) the constraint cannot always
-            // hold; relax to "just not playing in this match".
-            if (!valid.Any())
-                valid = teamIds.Where(t => t != a && t != b).ToList();
+                // Fallback for very small pools where constraint can't always hold
+                if (!valid.Any())
+                    valid = allTeamIds.Where(t => t != a && t != b).ToList();
 
-            // Pick the team with fewest ref assignments; break ties by highest off-streak
-            int referee = valid
-                .OrderBy(t => refCount[t])
-                .ThenByDescending(t => offStreak[t])  // offStreak still tracks play gaps
-                .First();
-
-            refCount[referee]++;
-            result.Add((a, b, referee));
+                int referee = valid.OrderBy(t => refCount[t]).ThenBy(t => t).First();
+                refCount[referee]++;
+                result.Add((a, b, referee, c + 1));
+            }
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Generates a round-robin fixture list using the circle/polygon method.
+    /// Each returned inner list is one "round": all its pairs are non-conflicting
+    /// (every team appears at most once). This guarantees matches in the same round
+    /// can be played simultaneously without any team being double-booked.
+    /// N even → N-1 rounds of N/2 matches each.
+    /// N odd  → N rounds of (N-1)/2 matches each (one team sits out per round).
+    /// </summary>
+    private static List<List<(int a, int b)>> GenerateRoundRobinRounds(List<int> teamIds)
+    {
+        var rounds = new List<List<(int, int)>>();
+        int n = teamIds.Count;
+        if (n < 2) return rounds;
+
+        var teams = new List<int>(teamIds);
+        if (n % 2 == 1) teams.Add(-1); // -1 = phantom bye (odd teams)
+        int total = teams.Count;       // always even after this point
+
+        // The first team is fixed; the remaining total-1 teams rotate each round.
+        var rotating = teams.Skip(1).ToList();
+
+        for (int round = 0; round < total - 1; round++)
+        {
+            var current = new List<int> { teams[0] };
+            current.AddRange(rotating);
+
+            var roundMatches = new List<(int, int)>();
+            for (int i = 0; i < total / 2; i++)
+            {
+                int home = current[i];
+                int away = current[total - 1 - i];
+                if (home != -1 && away != -1) // skip phantom bye
+                    roundMatches.Add((home, away));
+            }
+            if (roundMatches.Any()) rounds.Add(roundMatches);
+
+            // Rotate: move last element of rotating to the front
+            var last = rotating[^1];
+            rotating.RemoveAt(rotating.Count - 1);
+            rotating.Insert(0, last);
+        }
+
+        return rounds;
     }
 
     /// <summary>

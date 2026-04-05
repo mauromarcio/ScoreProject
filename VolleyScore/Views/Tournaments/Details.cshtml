@@ -5,15 +5,9 @@
     var teams = Model.TournamentTeams.OrderBy(tt => tt.SeedOrder).ToList();
     int numCourts = Math.Max(1, Model.NumberOfCourts);
 
-    // Interleaved court preview: position i (0-based) → court (i%numCourts)+1
-    var courtGroups = teams
-        .Select((tt, i) => new { tt, court = (i % numCourts) + 1 })
-        .GroupBy(x => x.court)
-        .OrderBy(g => g.Key)
-        .ToList();
-
-    // Expected total pool matches = sum of n*(n-1)/2 per court group
-    int expectedMatches = courtGroups.Sum(g => { int n = g.Count(); return n * (n - 1) / 2; });
+    // Full round-robin: every team plays every other team exactly once
+    int n = teams.Count;
+    int expectedMatches = n * (n - 1) / 2;
 }
 
 <div class="container py-4" style="max-width:720px">
@@ -83,39 +77,14 @@
         </div>
     </div>
 
-    @* Court assignment preview — only shown in Setup before matches are generated *@
-    @if (Model.Status == TournamentStatus.Setup && numCourts > 1 && teams.Any())
+    @if (Model.Status == TournamentStatus.Setup && numCourts > 1)
     {
-        <div class="card mb-4">
-            <div class="card-header">
-                <strong>Court Assignment Preview</strong>
-                <span class="text-muted small ms-2">based on current seed order (interleaved)</span>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    @foreach (var group in courtGroups)
-                    {
-                        int n = group.Count();
-                        int matches = n * (n - 1) / 2;
-                        <div class="col-sm-6 col-md-4">
-                            <div class="card border-primary">
-                                <div class="card-header bg-primary text-white py-1 small fw-bold">
-                                    Court @group.Key &nbsp;·&nbsp; @n teams &nbsp;·&nbsp; @matches matches
-                                </div>
-                                <ul class="list-group list-group-flush">
-                                    @foreach (var x in group.OrderBy(g => g.tt.SeedOrder))
-                                    {
-                                        <li class="list-group-item py-1 small">
-                                            <span class="badge bg-secondary me-1">@x.tt.SeedOrder</span>
-                                            @x.tt.Team?.Name
-                                        </li>
-                                    }
-                                </ul>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
+        <div class="alert alert-info small mb-4">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>@numCourts courts</strong> configured.
+            All @n teams will play each other — <strong>@expectedMatches matches</strong> total.
+            Matches will be distributed evenly across courts so games can run in parallel,
+            reducing total tournament time without affecting standings.
         </div>
     }
 
@@ -126,17 +95,13 @@
             <span class="text-muted small">Drag to reorder seeding</span>
         </div>
         <ul class="list-group list-group-flush" id="teamSortList">
-            @foreach (var x in teams.Select((tt, i) => new { tt, court = (i % numCourts) + 1 }))
+            @foreach (var tt in teams)
             {
                 <li class="list-group-item d-flex align-items-center gap-3 sortable-item"
-                    data-team-id="@x.tt.TeamId">
+                    data-team-id="@tt.TeamId">
                     <i class="bi bi-grip-vertical text-muted" style="cursor:grab"></i>
-                    <span class="badge bg-secondary seed-badge">@x.tt.SeedOrder</span>
-                    @if (numCourts > 1)
-                    {
-                        <span class="badge bg-primary court-badge">C@x.court</span>
-                    }
-                    <span class="fw-semibold">@x.tt.Team?.Name</span>
+                    <span class="badge bg-secondary seed-badge">@tt.SeedOrder</span>
+                    <span class="fw-semibold">@tt.Team?.Name</span>
                 </li>
             }
         </ul>
@@ -197,7 +162,6 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
     var tournamentId = @Model.Id;
-    var numCourts    = @numCourts;
     var sortList     = document.getElementById('teamSortList');
     var statusEl     = document.getElementById('reorderStatus');
     var saveTimer    = null;
@@ -207,11 +171,7 @@
         handle: '.bi-grip-vertical',
         onEnd: function () {
             sortList.querySelectorAll('.sortable-item').forEach(function(el, idx) {
-                // Seed badge
                 el.querySelector('.seed-badge').textContent = idx + 1;
-                // Court badge (only present when numCourts > 1)
-                var cb = el.querySelector('.court-badge');
-                if (cb) cb.textContent = 'C' + ((idx % numCourts) + 1);
             });
             clearTimeout(saveTimer);
             saveTimer = setTimeout(saveOrder, 600);

@@ -55,10 +55,6 @@
                             <tr>
                                 <th>#</th>
                                 <th>Team</th>
-                                @if (multiCourt)
-                                {
-                                    <th class="text-center" title="Court">Ct</th>
-                                }
                                 <th class="text-center" title="Sets Won">SW</th>
                                 <th class="text-center" title="Points Made">PM</th>
                                 <th class="text-center" title="Points Against">PA</th>
@@ -74,12 +70,6 @@
                                 <tr class="@rowClass">
                                     <td class="fw-bold">@(i + 1)</td>
                                     <td>@s.TeamName</td>
-                                    @if (multiCourt)
-                                    {
-                                        <td class="text-center">
-                                            <span class="badge bg-primary">@s.CourtNumber</span>
-                                        </td>
-                                    }
                                     <td class="text-center fw-bold">@s.SetsWon</td>
                                     <td class="text-center">@s.PointsMade</td>
                                     <td class="text-center">@s.PointsAgainst</td>
@@ -95,7 +85,6 @@
                 </div>
                 <div class="card-footer text-muted small">
                     SW = Sets Won &nbsp;|&nbsp; PM = Points Made &nbsp;|&nbsp; PA = Points Against
-                    @if (multiCourt) { <span>&nbsp;|&nbsp; Ct = Court</span> }
                 </div>
             </div>
 
