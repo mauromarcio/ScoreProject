@@ -466,12 +466,17 @@ public class TournamentsController : Controller
         //   2. Teams that played in the PREVIOUS slot must rest if at all possible
         //      (mustRest, threshold = 1 play → tries to avoid any back-to-back).
         //      Relaxed to baseCandidates only when no non-mustRest pair exists.
-        //   3. Among remaining candidates, pick the pair with the longest
-        //      combined wait (slotIdx − lastPlayed for each team).
-        var teamLastSlot   = allTeamIds.ToDictionary(t => t, _ => -99);
-        var teamPlayStreak = allTeamIds.ToDictionary(t => t, _ => 0);
-        var teamSitStreak  = allTeamIds.ToDictionary(t => t, _ => 0);
-        var slots          = new List<List<(int a, int b, int court)>>();
+        //   3. In the forced-fallback case, prefer pairs where:
+        //      a) Fewer of the two teams are in mustRest (1 consecutive > 2 consecutive).
+        //      b) Those teams have been forced into fewer consecutive plays before
+        //         (teamConsecCount) — spreads the "burden" evenly across all teams
+        //         and prevents any one team from playing 3+ matches in a row.
+        //   4. Tiebreak: longest combined wait (slotIdx − lastPlayed).
+        var teamLastSlot    = allTeamIds.ToDictionary(t => t, _ => -99);
+        var teamPlayStreak  = allTeamIds.ToDictionary(t => t, _ => 0);
+        var teamSitStreak   = allTeamIds.ToDictionary(t => t, _ => 0);
+        var teamConsecCount = allTeamIds.ToDictionary(t => t, _ => 0); // forced back-to-back tally
+        var slots           = new List<List<(int a, int b, int court)>>();
 
         while (remaining.Count > 0)
         {
@@ -482,8 +487,7 @@ public class TournamentsController : Controller
             for (int court = 0; court < numCourts && remaining.Count > 0; court++)
             {
                 var mustPlay = allTeamIds.Where(t => teamSitStreak[t]  >= 2).ToHashSet();
-                // Threshold 1: any team that just played is in mustRest →
-                // algorithm tries hard to avoid back-to-back plays.
+                // Any team that just played is mustRest — algorithm avoids back-to-back.
                 var mustRest = allTeamIds.Where(t => teamPlayStreak[t] >= 1).ToHashSet();
 
                 // Base: neither team already committed to this slot
@@ -500,14 +504,29 @@ public class TournamentsController : Controller
 
                 if (!pool.Any()) pool = baseCandidates; // relax streak limit as last resort
 
-                // Score: heavily favour mustPlay teams, then longest combined wait
+                // Scoring — applied to whichever pool we ended up with:
+                //   Primary : mustPlay boost
+                //   Secondary: in fallback mode, minimise the number of mustRest teams in
+                //               the pair (prefer 1 consecutive over 2), then prefer teams
+                //               with the fewest prior forced-consecutives (teamConsecCount)
+                //   Tertiary : longest combined wait
                 var pick = pool
                     .OrderByDescending(p =>
                         (mustPlay.Contains(p.a) ? 1000 : 0) +
-                        (mustPlay.Contains(p.b) ? 1000 : 0) +
+                        (mustPlay.Contains(p.b) ? 1000 : 0))
+                    .ThenBy(p =>
+                        (mustRest.Contains(p.a) ? 1 : 0) +
+                        (mustRest.Contains(p.b) ? 1 : 0))          // fewer mustRest in pair
+                    .ThenBy(p =>
+                        teamConsecCount[p.a] + teamConsecCount[p.b]) // spread forced consecutives
+                    .ThenByDescending(p =>
                         (slotIdx - teamLastSlot[p.a]) +
-                        (slotIdx - teamLastSlot[p.b]))
+                        (slotIdx - teamLastSlot[p.b]))              // longest wait as tiebreak
                     .First();
+
+                // Record forced consecutive plays so future slots can avoid repeating them
+                if (mustRest.Contains(pick.a)) teamConsecCount[pick.a]++;
+                if (mustRest.Contains(pick.b)) teamConsecCount[pick.b]++;
 
                 slotMatches.Add((pick.a, pick.b, court + 1));
                 slotTeams.Add(pick.a);
