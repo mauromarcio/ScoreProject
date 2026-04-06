@@ -437,121 +437,130 @@ public class TournamentsController : Controller
     ///   in parallel so the tournament finishes faster.
     /// - Match order per court is derived from the circle-method so no team plays
     ///   two matches in the same "round" (no simultaneous conflicts).
-    /// - Referee rule (per court): the team playing NEXT on that court cannot ref
-    ///   the current match on that court.
     /// - Referee assignments are distributed as evenly as possible across all teams.
+    /// - No team plays more than 2 matches in a row (best-effort).
+    /// - No team sits more than 2 slots in a row (best-effort).
+    /// - The "don't ref if playing next" rule is intentionally omitted: with many
+    ///   parallel courts the idle pool can be as small as 1 team, making it
+    ///   impossible to honour without leaving matches without a referee.
     /// </summary>
     private static List<(int home, int away, int referee, int court)> BuildMultiCourtSchedule(
         List<int> allTeamIds, int numCourts)
     {
         numCourts = Math.Max(1, numCourts);
 
-        // ── Step 1: Generate all rounds via the circle method ─────────────────
-        // Each round contains non-conflicting pairs (no team appears twice per round).
-        var rounds = GenerateRoundRobinRounds(allTeamIds);
+        // ── Step 1: Collect all match pairs ──────────────────────────────────
+        var rounds   = GenerateRoundRobinRounds(allTeamIds);
+        var remaining = rounds.SelectMany(r => r).ToList();
 
-        // ── Step 2: Distribute round matches across courts ────────────────────
-        // For each round, assign its matches to courts in rotation, always filling
-        // the court with the shortest current queue first (balances load).
-        var courtQueues = new List<List<(int a, int b)>>(numCourts);
-        for (int c = 0; c < numCourts; c++) courtQueues.Add(new List<(int, int)>());
+        // ── Step 2: Build time slots greedily ────────────────────────────────
+        // Each slot holds up to numCourts matches. Within a slot, no team appears
+        // on more than one court (guaranteed by slotTeams set).
+        //
+        // Priority when choosing the next match for a slot:
+        //   1. Teams whose sit-streak has reached 2 must get a game (mustPlay).
+        //   2. Teams whose play-streak has reached 2 must rest (mustRest) —
+        //      excluded unless no other option exists.
+        //   3. Among remaining candidates, pick the pair with the longest
+        //      combined wait (slotIdx − lastPlayed for each team).
+        var teamLastSlot   = allTeamIds.ToDictionary(t => t, _ => -99);
+        var teamPlayStreak = allTeamIds.ToDictionary(t => t, _ => 0);
+        var teamSitStreak  = allTeamIds.ToDictionary(t => t, _ => 0);
+        var slots          = new List<List<(int a, int b, int court)>>();
 
-        foreach (var round in rounds)
+        while (remaining.Count > 0)
         {
-            var byLoad = Enumerable.Range(0, numCourts)
-                .OrderBy(c => courtQueues[c].Count)
-                .ToList();
-            for (int i = 0; i < round.Count; i++)
-                courtQueues[byLoad[i % numCourts]].Add(round[i]);
-        }
+            int slotIdx     = slots.Count;
+            var slotTeams   = new HashSet<int>();
+            var slotMatches = new List<(int a, int b, int court)>();
 
-        // ── Step 2b: Reorder each court's queue to avoid back-to-back appearances ─
-        for (int c = 0; c < numCourts; c++)
-            courtQueues[c] = ReorderToAvoidConsecutive(courtQueues[c], allTeamIds);
-
-        // ── Step 3: Assign referees — interleaved across courts, no consecutive slots ─
-        //
-        // Why interleaved?  Processing all of court 1 then all of court 2 lets one
-        // court drain the low-refCount pool before the others even start, creating
-        // imbalance.  Interleaving (c1m1 → c2m1 → c1m2 → c2m2 → …) keeps the
-        // global refCount fair at every step.
-        //
-        // Two extra constraints vs. before:
-        //  • A team playing in the NEXT match on this court cannot ref now.
-        //  • The team that just refereed on this court cannot ref again immediately
-        //    (tracked per court in lastRefPerCourt[]).
-        //
-        // Fallbacks relax constraints in order until a valid candidate is found.
-        var refCount        = allTeamIds.ToDictionary(t => t, _ => 0);
-        var lastRefPerCourt = new int[numCourts];   // 0 = no previous ref yet
-        var result          = new List<(int home, int away, int referee, int court)>();
-
-        int maxLen = courtQueues.Max(q => q.Count);
-        for (int matchIdx = 0; matchIdx < maxLen; matchIdx++)
-        {
-            // All teams playing on ANY court at this slot — they cannot ref any court simultaneously.
-            var playingAtSlot = new HashSet<int>();
-            for (int c = 0; c < numCourts; c++)
+            for (int court = 0; court < numCourts && remaining.Count > 0; court++)
             {
-                if (matchIdx < courtQueues[c].Count)
-                {
-                    var (pa, pb) = courtQueues[c][matchIdx];
-                    playingAtSlot.Add(pa);
-                    playingAtSlot.Add(pb);
-                }
+                var mustPlay = allTeamIds.Where(t => teamSitStreak[t]  >= 2).ToHashSet();
+                var mustRest = allTeamIds.Where(t => teamPlayStreak[t] >= 2).ToHashSet();
+
+                // Base: neither team already committed to this slot
+                var baseCandidates = remaining
+                    .Where(p => !slotTeams.Contains(p.a) && !slotTeams.Contains(p.b))
+                    .ToList();
+
+                if (!baseCandidates.Any()) break;
+
+                // Prefer pairs that don't involve teams that must rest
+                var pool = baseCandidates
+                    .Where(p => !mustRest.Contains(p.a) && !mustRest.Contains(p.b))
+                    .ToList();
+
+                if (!pool.Any()) pool = baseCandidates; // relax streak limit as last resort
+
+                // Score: heavily favour mustPlay teams, then longest combined wait
+                var pick = pool
+                    .OrderByDescending(p =>
+                        (mustPlay.Contains(p.a) ? 1000 : 0) +
+                        (mustPlay.Contains(p.b) ? 1000 : 0) +
+                        (slotIdx - teamLastSlot[p.a]) +
+                        (slotIdx - teamLastSlot[p.b]))
+                    .First();
+
+                slotMatches.Add((pick.a, pick.b, court + 1));
+                slotTeams.Add(pick.a);
+                slotTeams.Add(pick.b);
+                remaining.Remove(pick);
             }
 
-            // Track refs already assigned at this slot so no team refs two courts at once.
-            var refsAtSlot = new HashSet<int>();
-
-            for (int c = 0; c < numCourts; c++)
+            // Update streaks for every team after this slot is finalised
+            foreach (var t in allTeamIds)
             {
-                var pairs = courtQueues[c];
-                if (matchIdx >= pairs.Count) continue;
+                if (slotTeams.Contains(t)) { teamPlayStreak[t]++; teamSitStreak[t]  = 0; }
+                else                       { teamSitStreak[t]++;  teamPlayStreak[t] = 0; }
+            }
+            foreach (var (a, b, _) in slotMatches)
+                teamLastSlot[a] = teamLastSlot[b] = slotIdx;
 
-                var (a, b) = pairs[matchIdx];
+            slots.Add(slotMatches);
+        }
 
-                var nextPlayers = matchIdx + 1 < pairs.Count
-                    ? new HashSet<int> { pairs[matchIdx + 1].Item1, pairs[matchIdx + 1].Item2 }
-                    : new HashSet<int>();
+        // ── Step 3: Assign referees per slot ─────────────────────────────────
+        // Idle teams (not playing at this slot) are the only candidates.
+        // Rules:
+        //   • Not already reffing another court at this same slot.
+        //   • Prefer a team that did NOT just ref on this court (no consecutive).
+        //   • Among valid candidates pick lowest refCount for even distribution.
+        var refCount        = allTeamIds.ToDictionary(t => t, _ => 0);
+        var lastRefPerCourt = new int[numCourts]; // 0 = no previous ref yet
+        var result          = new List<(int home, int away, int referee, int court)>();
 
-                int prevRef = lastRefPerCourt[c];
+        foreach (var slot in slots)
+        {
+            var playingAtSlot = slot.SelectMany(m => new[] { m.a, m.b }).ToHashSet();
+            var refsAtSlot    = new HashSet<int>();
 
-                // Full constraints:
-                //   • not playing on any court at this slot (covers current a/b + other courts)
-                //   • not already reffing another court at this slot
-                //   • not playing next on this court
-                //   • not just reffed this court (avoid consecutive)
+            foreach (var (a, b, court) in slot)
+            {
+                int prevRef = lastRefPerCourt[court - 1];
+
+                // Full: idle, not already reffing this slot, not consecutive on this court
                 var valid = allTeamIds
                     .Where(t => !playingAtSlot.Contains(t)
                              && !refsAtSlot.Contains(t)
-                             && !nextPlayers.Contains(t)
                              && (prevRef == 0 || t != prevRef))
                     .ToList();
 
-                // Fallback 1: allow the previous ref to repeat (still blocks cross-slot conflicts)
-                if (!valid.Any())
-                    valid = allTeamIds
-                        .Where(t => !playingAtSlot.Contains(t)
-                                 && !refsAtSlot.Contains(t)
-                                 && !nextPlayers.Contains(t))
-                        .ToList();
-
-                // Fallback 2: relax next-player constraint too
+                // Fallback 1: allow consecutive ref on this court
                 if (!valid.Any())
                     valid = allTeamIds
                         .Where(t => !playingAtSlot.Contains(t) && !refsAtSlot.Contains(t))
                         .ToList();
 
-                // Fallback 3: last resort — only block current players on this court
+                // Fallback 2: last resort — only block current players on this court
                 if (!valid.Any())
                     valid = allTeamIds.Where(t => t != a && t != b).ToList();
 
                 int referee = valid.OrderBy(t => refCount[t]).ThenBy(t => t).First();
                 refCount[referee]++;
-                lastRefPerCourt[c] = referee;
+                lastRefPerCourt[court - 1] = referee;
                 refsAtSlot.Add(referee);
-                result.Add((a, b, referee, c + 1));
+                result.Add((a, b, referee, court));
             }
         }
 
