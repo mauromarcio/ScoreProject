@@ -438,11 +438,15 @@ public class TournamentsController : Controller
     /// - Match order per court is derived from the circle-method so no team plays
     ///   two matches in the same "round" (no simultaneous conflicts).
     /// - Referee assignments are distributed as evenly as possible across all teams.
-    /// - No team plays more than 2 matches in a row (best-effort).
+    /// - No back-to-back plays (best-effort; mathematically unavoidable in some
+    ///   configurations, e.g. 6 teams / 2 courts where 4/6 teams must play every
+    ///   slot — the algorithm minimises occurrences via fallback).
     /// - No team sits more than 2 slots in a row (best-effort).
     /// - The "don't ref if playing next" rule is intentionally omitted: with many
     ///   parallel courts the idle pool can be as small as 1 team, making it
     ///   impossible to honour without leaving matches without a referee.
+    /// - Court-affinity reffing: teams ref the court they play on most; they are
+    ///   only assigned to a different court when no same-court candidate exists.
     /// </summary>
     private static List<(int home, int away, int referee, int court)> BuildMultiCourtSchedule(
         List<int> allTeamIds, int numCourts)
@@ -450,7 +454,7 @@ public class TournamentsController : Controller
         numCourts = Math.Max(1, numCourts);
 
         // ── Step 1: Collect all match pairs ──────────────────────────────────
-        var rounds   = GenerateRoundRobinRounds(allTeamIds);
+        var rounds    = GenerateRoundRobinRounds(allTeamIds);
         var remaining = rounds.SelectMany(r => r).ToList();
 
         // ── Step 2: Build time slots greedily ────────────────────────────────
@@ -459,8 +463,9 @@ public class TournamentsController : Controller
         //
         // Priority when choosing the next match for a slot:
         //   1. Teams whose sit-streak has reached 2 must get a game (mustPlay).
-        //   2. Teams whose play-streak has reached 2 must rest (mustRest) —
-        //      excluded unless no other option exists.
+        //   2. Teams that played in the PREVIOUS slot must rest if at all possible
+        //      (mustRest, threshold = 1 play → tries to avoid any back-to-back).
+        //      Relaxed to baseCandidates only when no non-mustRest pair exists.
         //   3. Among remaining candidates, pick the pair with the longest
         //      combined wait (slotIdx − lastPlayed for each team).
         var teamLastSlot   = allTeamIds.ToDictionary(t => t, _ => -99);
@@ -477,7 +482,9 @@ public class TournamentsController : Controller
             for (int court = 0; court < numCourts && remaining.Count > 0; court++)
             {
                 var mustPlay = allTeamIds.Where(t => teamSitStreak[t]  >= 2).ToHashSet();
-                var mustRest = allTeamIds.Where(t => teamPlayStreak[t] >= 2).ToHashSet();
+                // Threshold 1: any team that just played is in mustRest →
+                // algorithm tries hard to avoid back-to-back plays.
+                var mustRest = allTeamIds.Where(t => teamPlayStreak[t] >= 1).ToHashSet();
 
                 // Base: neither team already committed to this slot
                 var baseCandidates = remaining
@@ -520,12 +527,29 @@ public class TournamentsController : Controller
             slots.Add(slotMatches);
         }
 
-        // ── Step 3: Assign referees per slot ─────────────────────────────────
-        // Idle teams (not playing at this slot) are the only candidates.
-        // Rules:
-        //   • Not already reffing another court at this same slot.
-        //   • Prefer a team that did NOT just ref on this court (no consecutive).
-        //   • Among valid candidates pick lowest refCount for even distribution.
+        // ── Step 3: Compute court-play affinity ──────────────────────────────
+        // Counts how many times each team has been scheduled to play on each court.
+        // Used in Step 4 so refs are preferentially drawn from teams that already
+        // play most on the court being refereed.
+        var courtAffinity = allTeamIds.ToDictionary(t => t, _ => new int[numCourts]);
+        foreach (var slot in slots)
+            foreach (var (a, b, c) in slot)
+            {
+                courtAffinity[a][c - 1]++;
+                courtAffinity[b][c - 1]++;
+            }
+
+        // ── Step 4: Assign referees per slot ─────────────────────────────────
+        // Only idle teams (not playing at this slot) are candidates.
+        //
+        // Selection order:
+        //   1. Must not already be reffing another court at this same slot.
+        //   2. Prefer team that did NOT just ref this court (avoid consecutive).
+        //      → relaxed to allow consecutive only when no other idle team exists.
+        //   3. Sort by court-play affinity DESC for this court (same-court preference
+        //      — team refs on the court it plays most; crosses courts only when
+        //      strictly necessary).
+        //   4. Then sort by refCount ASC (even distribution across all teams).
         var refCount        = allTeamIds.ToDictionary(t => t, _ => 0);
         var lastRefPerCourt = new int[numCourts]; // 0 = no previous ref yet
         var result          = new List<(int home, int away, int referee, int court)>();
@@ -539,24 +563,23 @@ public class TournamentsController : Controller
             {
                 int prevRef = lastRefPerCourt[court - 1];
 
-                // Full: idle, not already reffing this slot, not consecutive on this court
-                var valid = allTeamIds
-                    .Where(t => !playingAtSlot.Contains(t)
-                             && !refsAtSlot.Contains(t)
-                             && (prevRef == 0 || t != prevRef))
+                // Base idle pool: not playing, not already reffing this slot
+                var idle = allTeamIds
+                    .Where(t => !playingAtSlot.Contains(t) && !refsAtSlot.Contains(t))
                     .ToList();
 
-                // Fallback 1: allow consecutive ref on this court
-                if (!valid.Any())
-                    valid = allTeamIds
-                        .Where(t => !playingAtSlot.Contains(t) && !refsAtSlot.Contains(t))
-                        .ToList();
+                // Prefer: also avoid consecutive ref on this court
+                var valid = idle.Where(t => prevRef == 0 || t != prevRef).ToList();
+                if (!valid.Any()) valid = idle;                                    // relax consecutive
+                if (!valid.Any()) valid = allTeamIds.Where(t => t != a && t != b).ToList(); // last resort
 
-                // Fallback 2: last resort — only block current players on this court
-                if (!valid.Any())
-                    valid = allTeamIds.Where(t => t != a && t != b).ToList();
+                // Court-affinity first, then even refCount distribution
+                int referee = valid
+                    .OrderByDescending(t => courtAffinity[t][court - 1])
+                    .ThenBy(t => refCount[t])
+                    .ThenBy(t => t)
+                    .First();
 
-                int referee = valid.OrderBy(t => refCount[t]).ThenBy(t => t).First();
                 refCount[referee]++;
                 lastRefPerCourt[court - 1] = referee;
                 refsAtSlot.Add(referee);
