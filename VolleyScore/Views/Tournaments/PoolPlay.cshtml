@@ -129,10 +129,8 @@
                                 <tr class="@rowClass">
                                     <td class="fw-bold">@(i + 1)</td>
                                     <td>
-                                        @if (teamNumbers.TryGetValue(s.TeamId, out var tn))
-                                        {
-                                            <span class="text-muted small me-1">T@tn</span>
-                                        }
+                                        @{ int tn = teamNumbers.GetValueOrDefault(s.TeamId, 0); }
+                                        @if (tn > 0) { <span class="text-muted small me-1">T@(tn)</span> }
                                         @s.TeamName
                                     </td>
                                     <td class="text-center fw-bold">@s.SetsWon</td>

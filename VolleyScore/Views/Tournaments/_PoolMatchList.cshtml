@@ -3,7 +3,7 @@
 @using VolleyScore.Models
 @{
     var teamNums = ViewBag.TeamNumbers as Dictionary<int, int> ?? new Dictionary<int, int>();
-    int TNum(int id) => teamNums.TryGetValue(id, out var n) ? n : 0;
+    Func<int, int> TNum = id => teamNums.GetValueOrDefault(id, 0);
 }
 
 <div class="match-list">
@@ -47,7 +47,7 @@
                       data-pos="home"
                       data-team-id="@m.HomeTeamId"
                       title="Drag to swap">
-                    <span class="team-num">T@homeNum</span>
+                    <span class="team-num">T@(homeNum)</span>
                     <span class="team-name">@m.HomeTeam?.Name</span>@if (tm.HomeTeamLongWait) {<span class="text-warning ms-1" title="3+ idle slots before this match">★</span>}
                 </span>
                 <span class="text-muted" style="font-size:.8em">vs</span>
@@ -57,7 +57,7 @@
                       data-pos="away"
                       data-team-id="@m.AwayTeamId"
                       title="Drag to swap">
-                    <span class="team-num">T@awayNum</span>
+                    <span class="team-num">T@(awayNum)</span>
                     <span class="team-name">@m.AwayTeam?.Name</span>@if (tm.AwayTeamLongWait) {<span class="text-warning ms-1" title="3+ idle slots before this match">★</span>}
                 </span>
             </div>
@@ -72,7 +72,7 @@
                           data-pos="ref"
                           data-team-id="@(tm.RefereeTeamId ?? 0)"
                           title="Drag to swap referee">
-                        <span class="team-num">T@refNum</span>
+                        <span class="team-num">T@(refNum)</span>
                         <span class="team-name">@tm.RefereeTeam.Name</span>
                     </span>
                 </div>
