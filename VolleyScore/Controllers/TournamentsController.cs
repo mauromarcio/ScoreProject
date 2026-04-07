@@ -131,7 +131,7 @@ public class TournamentsController : Controller
         var schedule = BuildMultiCourtSchedule(allTeamIds, courts);
 
         int matchNumber = 1;
-        foreach (var (homeId, awayId, refId, courtNum) in schedule)
+        foreach (var (homeId, awayId, refId, courtNum, homeLong, awayLong) in schedule)
         {
             var match = new Match
             {
@@ -169,7 +169,9 @@ public class TournamentsController : Controller
                 Stage = TournamentStage.Pool,
                 MatchNumber = matchNumber,
                 RefereeTeamId = refId,
-                CourtNumber = courtNum
+                CourtNumber = courtNum,
+                HomeTeamLongWait = homeLong,
+                AwayTeamLongWait = awayLong
             });
 
             matchNumber++;
@@ -476,17 +478,18 @@ public class TournamentsController : Controller
         var teamPlayStreak  = allTeamIds.ToDictionary(t => t, _ => 0);
         var teamSitStreak   = allTeamIds.ToDictionary(t => t, _ => 0);
         var teamConsecCount = allTeamIds.ToDictionary(t => t, _ => 0); // forced back-to-back tally
-        var slots           = new List<List<(int a, int b, int court)>>();
+        // longWait flag: true when the team had ≥3 consecutive idle slots before this match
+        var slots = new List<List<(int a, int b, int court, bool aLong, bool bLong)>>();
 
         while (remaining.Count > 0)
         {
             int slotIdx     = slots.Count;
             var slotTeams   = new HashSet<int>();
-            var slotMatches = new List<(int a, int b, int court)>();
+            var slotMatches = new List<(int a, int b, int court, bool aLong, bool bLong)>();
 
             for (int court = 0; court < numCourts && remaining.Count > 0; court++)
             {
-                var mustPlay = allTeamIds.Where(t => teamSitStreak[t]  >= 2).ToHashSet();
+                var mustPlay = allTeamIds.Where(t => teamSitStreak[t]  >= 3).ToHashSet();
                 // Any team that just played is mustRest — algorithm avoids back-to-back.
                 var mustRest = allTeamIds.Where(t => teamPlayStreak[t] >= 1).ToHashSet();
 
@@ -528,7 +531,11 @@ public class TournamentsController : Controller
                 if (mustRest.Contains(pick.a)) teamConsecCount[pick.a]++;
                 if (mustRest.Contains(pick.b)) teamConsecCount[pick.b]++;
 
-                slotMatches.Add((pick.a, pick.b, court + 1));
+                // Capture long-wait flag BEFORE streaks are reset (sitStreak still reflects pre-slot value)
+                bool aLong = teamSitStreak[pick.a] >= 3;
+                bool bLong = teamSitStreak[pick.b] >= 3;
+
+                slotMatches.Add((pick.a, pick.b, court + 1, aLong, bLong));
                 slotTeams.Add(pick.a);
                 slotTeams.Add(pick.b);
                 remaining.Remove(pick);
@@ -540,7 +547,7 @@ public class TournamentsController : Controller
                 if (slotTeams.Contains(t)) { teamPlayStreak[t]++; teamSitStreak[t]  = 0; }
                 else                       { teamSitStreak[t]++;  teamPlayStreak[t] = 0; }
             }
-            foreach (var (a, b, _) in slotMatches)
+            foreach (var (a, b, _, _, _) in slotMatches)
                 teamLastSlot[a] = teamLastSlot[b] = slotIdx;
 
             slots.Add(slotMatches);
@@ -552,7 +559,7 @@ public class TournamentsController : Controller
         // play most on the court being refereed.
         var courtAffinity = allTeamIds.ToDictionary(t => t, _ => new int[numCourts]);
         foreach (var slot in slots)
-            foreach (var (a, b, c) in slot)
+            foreach (var (a, b, c, _, _) in slot)
             {
                 courtAffinity[a][c - 1]++;
                 courtAffinity[b][c - 1]++;
@@ -571,14 +578,14 @@ public class TournamentsController : Controller
         //   4. Then sort by refCount ASC (even distribution across all teams).
         var refCount        = allTeamIds.ToDictionary(t => t, _ => 0);
         var lastRefPerCourt = new int[numCourts]; // 0 = no previous ref yet
-        var result          = new List<(int home, int away, int referee, int court)>();
+        var result          = new List<(int home, int away, int referee, int court, bool homeLong, bool awayLong)>();
 
         foreach (var slot in slots)
         {
             var playingAtSlot = slot.SelectMany(m => new[] { m.a, m.b }).ToHashSet();
             var refsAtSlot    = new HashSet<int>();
 
-            foreach (var (a, b, court) in slot)
+            foreach (var (a, b, court, aLong, bLong) in slot)
             {
                 int prevRef = lastRefPerCourt[court - 1];
 
@@ -602,7 +609,7 @@ public class TournamentsController : Controller
                 refCount[referee]++;
                 lastRefPerCourt[court - 1] = referee;
                 refsAtSlot.Add(referee);
-                result.Add((a, b, referee, court));
+                result.Add((a, b, referee, court, aLong, bLong));
             }
         }
 

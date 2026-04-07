@@ -29,6 +29,18 @@ public class TournamentMatch
     /// <summary>Court number this match is played on (pool play only; 1 when not multi-court)</summary>
     public int CourtNumber { get; set; } = 1;
 
+    /// <summary>
+    /// True when the home team had 3 consecutive idle slots before this match.
+    /// Displayed as ★ in the schedule to indicate a long wait.
+    /// </summary>
+    public bool HomeTeamLongWait { get; set; } = false;
+
+    /// <summary>
+    /// True when the away team had 3 consecutive idle slots before this match.
+    /// Displayed as ★ in the schedule to indicate a long wait.
+    /// </summary>
+    public bool AwayTeamLongWait { get; set; } = false;
+
     // Navigation
     [ForeignKey("TournamentId")]
     public Tournament? Tournament { get; set; }

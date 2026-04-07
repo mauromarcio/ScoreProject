@@ -122,6 +122,10 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE TournamentMatches ADD RefereeTeamId INT NULL REFERENCES Teams(Id);
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'CourtNumber')
                 ALTER TABLE TournamentMatches ADD CourtNumber INT NOT NULL DEFAULT 1;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'HomeTeamLongWait')
+                ALTER TABLE TournamentMatches ADD HomeTeamLongWait BIT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'AwayTeamLongWait')
+                ALTER TABLE TournamentMatches ADD AwayTeamLongWait BIT NOT NULL DEFAULT 0;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentTeams' AND COLUMN_NAME = 'CourtNumber')
                 ALTER TABLE TournamentTeams ADD CourtNumber INT NOT NULL DEFAULT 1;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'NumberOfCourts')

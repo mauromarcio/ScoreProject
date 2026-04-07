@@ -85,6 +85,10 @@
         @Model.PoolMatches.Count matches
         @if (multiCourt) { <text>&nbsp;·&nbsp; @numCourts courts (parallel play)</text> }
         &nbsp;·&nbsp; @Model.PoolMatches.Count(m => m.Match?.Status == MatchStatus.Completed) completed
+        @if (Model.PoolMatches.Any(m => m.HomeTeamLongWait || m.AwayTeamLongWait))
+        {
+            <text>&nbsp;·&nbsp; <span style="color:#c8a000">★</span> = team had 3 consecutive idle slots before this match</text>
+        }
     </div>
 </div>
 
@@ -124,9 +128,9 @@
                     string rowClass = completed ? "done" : "";
                     <tr class="@rowClass">
                         <td class="col-num">@tm.MatchNumber</td>
-                        <td class="col-team">@m.HomeTeam?.Name</td>
+                        <td class="col-team">@m.HomeTeam?.Name@if (tm.HomeTeamLongWait) {<span title="Long wait (3 idle slots)" style="color:#c8a000;margin-left:3px">★</span>}</td>
                         <td class="col-vs">vs</td>
-                        <td class="col-team">@m.AwayTeam?.Name</td>
+                        <td class="col-team">@m.AwayTeam?.Name@if (tm.AwayTeamLongWait) {<span title="Long wait (3 idle slots)" style="color:#c8a000;margin-left:3px">★</span>}</td>
                         <td class="col-ref">@(tm.RefereeTeam?.Name ?? "—")</td>
                         <td class="col-set">
                             @if (completed)
