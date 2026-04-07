@@ -1,17 +1,12 @@
-@* Partial: renders a list of TournamentMatch rows for pool play *@
+@* Partial: renders pool match cards for one court (no JS — all JS lives in PoolPlay.cshtml) *@
 @model IEnumerable<VolleyScore.Models.TournamentMatch>
 @using VolleyScore.Models
+@{
+    var teamNums = ViewBag.TeamNumbers as Dictionary<int, int> ?? new Dictionary<int, int>();
+    int TNum(int id) => teamNums.TryGetValue(id, out var n) ? n : 0;
+}
 
-<style>
-    .match-row { position: relative; transition: background-color 0.1s; }
-    .match-row.is-dragging { opacity: 0.35; }
-    .match-row.drop-above { border-top: 2px solid #0d6efd !important; }
-    .match-row.drop-below { border-bottom: 2px solid #0d6efd !important; }
-    .row-drag-handle { cursor: grab; color: #adb5bd; padding: 0 6px 0 2px; }
-    .row-drag-handle:hover { color: #6c757d; }
-</style>
-
-<div class="list-group list-group-flush pool-match-list">
+<div class="match-list">
     @foreach (var tm in Model)
     {
         var m = tm.Match;
@@ -20,230 +15,72 @@
                           m.Status == MatchStatus.InProgress ? "warning" : "secondary";
         var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
         var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
-        <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
-           class="list-group-item list-group-item-action match-row"
-           draggable="true"
-           data-tm-id="@tm.Id">
+        int homeNum = TNum(m.HomeTeamId);
+        int awayNum = TNum(m.AwayTeamId);
+        int refNum  = tm.RefereeTeamId.HasValue ? TNum(tm.RefereeTeamId.Value) : 0;
+        <div class="match-card" draggable="true" data-tm-id="@tm.Id" data-match-id="@m.Id">
             <div class="d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center gap-1">
                     <span class="row-drag-handle" title="Drag to reorder match">
                         <i class="bi bi-grip-vertical"></i>
                     </span>
-                    <span class="text-muted me-2 small match-num">#@tm.MatchNumber</span>
-                    <span class="fw-semibold">@m.HomeTeam?.Name</span>@if (tm.HomeTeamLongWait) {<span title="Long wait — team had 3 consecutive idle slots before this match" class="text-warning ms-1" style="font-size:.85em">★</span>}
-                    <span class="text-muted mx-2">vs</span>
-                    <span class="fw-semibold">@m.AwayTeam?.Name</span>@if (tm.AwayTeamLongWait) {<span title="Long wait — team had 3 consecutive idle slots before this match" class="text-warning ms-1" style="font-size:.85em">★</span>}
+                    <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
+                       draggable="false"
+                       class="text-muted small text-decoration-none"
+                       title="Open match">
+                        #<span class="match-num-val">@tm.MatchNumber</span>
+                    </a>
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-1">
                     @if (m.Status == MatchStatus.Completed)
                     {
-                        <span class="fw-bold">@homeSets – @awaySets</span>
+                        <span class="small fw-bold">@homeSets–@awaySets</span>
                     }
-                    <span class="badge bg-@statusClass">@m.Status</span>
+                    <span class="badge bg-@statusClass badge-status">@m.Status</span>
                 </div>
             </div>
-            <div class="d-flex justify-content-between align-items-center mt-1 ps-4">
-                @if (tm.RefereeTeam != null)
-                {
-                    <span class="small text-muted">
-                        <i class="bi bi-whistle me-1"></i>Referee:
-                        <strong
-                            class="referee-badge"
-                            draggable="true"
-                            data-tm-id="@tm.Id"
-                            title="Drag to swap referee with another match"
-                            style="cursor:grab; border-bottom:1px dashed #adb5bd">@tm.RefereeTeam.Name</strong>
-                    </span>
-                }
-                else { <span></span> }
-                @if (m.Status == MatchStatus.Completed)
-                {
-                    <span class="text-muted small">
-                        @string.Join("  |  ", m.Sets.OrderBy(s => s.SetNumber)
-                            .Select(s => $"Set {s.SetNumber}: {s.HomeScore}–{s.AwayScore}"))
-                    </span>
-                }
+
+            <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
+                <span class="team-chip"
+                      draggable="true"
+                      data-tm-id="@tm.Id"
+                      data-pos="home"
+                      data-team-id="@m.HomeTeamId"
+                      title="Drag to swap">
+                    <span class="team-num">T@homeNum</span>
+                    <span class="team-name">@m.HomeTeam?.Name</span>@if (tm.HomeTeamLongWait) {<span class="text-warning ms-1" title="3+ idle slots before this match">★</span>}
+                </span>
+                <span class="text-muted" style="font-size:.8em">vs</span>
+                <span class="team-chip"
+                      draggable="true"
+                      data-tm-id="@tm.Id"
+                      data-pos="away"
+                      data-team-id="@m.AwayTeamId"
+                      title="Drag to swap">
+                    <span class="team-num">T@awayNum</span>
+                    <span class="team-name">@m.AwayTeam?.Name</span>@if (tm.AwayTeamLongWait) {<span class="text-warning ms-1" title="3+ idle slots before this match">★</span>}
+                </span>
             </div>
-        </a>
+
+            @if (tm.RefereeTeam != null)
+            {
+                <div class="d-flex align-items-center gap-1 mt-1">
+                    <i class="bi bi-whistle text-muted" style="font-size:.8em"></i>
+                    <span class="team-chip team-chip-ref"
+                          draggable="true"
+                          data-tm-id="@tm.Id"
+                          data-pos="ref"
+                          data-team-id="@(tm.RefereeTeamId ?? 0)"
+                          title="Drag to swap referee">
+                        <span class="team-num">T@refNum</span>
+                        <span class="team-name">@tm.RefereeTeam.Name</span>
+                    </span>
+                </div>
+            }
+        </div>
     }
     @if (!Model.Any())
     {
-        <div class="list-group-item text-muted text-center py-4">No pool matches yet.</div>
+        <div class="text-muted text-center py-3 small">No matches.</div>
     }
 </div>
-
-@* Toast used for both referee swaps and match reorders *@
-<div id="pool-toast-container" class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
-    <div id="pool-toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-atomic="true">
-        <div class="d-flex">
-            <div class="toast-body" id="pool-toast-msg"></div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    </div>
-</div>
-
-<script>
-(function () {
-    // ── Helpers ────────────────────────────────────────────────────────────────
-
-    function showToast(msg, type) {
-        var el = document.getElementById('pool-toast');
-        if (!el || !window.bootstrap) return;
-        el.className = 'toast align-items-center border-0 text-bg-' + (type || 'success');
-        document.getElementById('pool-toast-msg').textContent = msg;
-        bootstrap.Toast.getOrCreateInstance(el, { delay: 2500 }).show();
-    }
-
-    // ── State ──────────────────────────────────────────────────────────────────
-
-    var dragType  = null;   // 'row' | 'ref'
-    var dragSrcEl = null;   // dragged .match-row element
-    var dragRefId = null;   // tmId of the dragged .referee-badge
-
-    // ── Drag-start: determine type ─────────────────────────────────────────────
-
-    document.addEventListener('dragstart', function (e) {
-        var badge = e.target.closest('.referee-badge');
-        var row   = e.target.closest('.match-row');
-
-        if (badge) {
-            // Referee badge drag — swap referees between two matches
-            dragType  = 'ref';
-            dragRefId = badge.dataset.tmId;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', 'ref:' + dragRefId);
-            badge.style.opacity = '0.45';
-            if (row) e.stopPropagation(); // don't also fire row drag
-        } else if (row) {
-            // Match row drag — reorder match within the list
-            dragType  = 'row';
-            dragSrcEl = row;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', 'row:' + row.dataset.tmId);
-            setTimeout(function () { row.classList.add('is-dragging'); }, 0);
-        }
-    }, true); // capture phase so badge fires before row
-
-    // ── Drag-end: clean up ─────────────────────────────────────────────────────
-
-    document.addEventListener('dragend', function (e) {
-        if (dragType === 'ref') {
-            var badge = e.target.closest('.referee-badge');
-            if (badge) badge.style.opacity = '';
-        }
-        if (dragType === 'row' && dragSrcEl) {
-            dragSrcEl.classList.remove('is-dragging');
-            clearDropIndicators();
-        }
-        dragType = null; dragSrcEl = null; dragRefId = null;
-    }, true);
-
-    // ── Drag-over ─────────────────────────────────────────────────────────────
-
-    document.addEventListener('dragover', function (e) {
-        if (dragType === 'ref') {
-            if (e.target.closest('.referee-badge')) e.preventDefault();
-        } else if (dragType === 'row') {
-            var targetRow = e.target.closest('.match-row');
-            if (targetRow && targetRow !== dragSrcEl) {
-                e.preventDefault();
-                clearDropIndicators();
-                var rect   = targetRow.getBoundingClientRect();
-                var midY   = rect.top + rect.height / 2;
-                var before = e.clientY < midY;
-                targetRow.classList.add(before ? 'drop-above' : 'drop-below');
-            }
-        }
-    }, true);
-
-    document.addEventListener('dragleave', function (e) {
-        if (dragType !== 'row') return;
-        var targetRow = e.target.closest('.match-row');
-        if (targetRow) {
-            targetRow.classList.remove('drop-above', 'drop-below');
-        }
-    }, true);
-
-    // ── Drop ──────────────────────────────────────────────────────────────────
-
-    document.addEventListener('drop', function (e) {
-        e.preventDefault();
-
-        if (dragType === 'ref') {
-            var badge = e.target.closest('.referee-badge');
-            if (!badge || !dragRefId || badge.dataset.tmId === dragRefId) return;
-            swapReferees(parseInt(dragRefId, 10), parseInt(badge.dataset.tmId, 10));
-
-        } else if (dragType === 'row' && dragSrcEl) {
-            var targetRow = e.target.closest('.match-row');
-            if (!targetRow || targetRow === dragSrcEl) { clearDropIndicators(); return; }
-
-            var list = targetRow.closest('.pool-match-list');
-            if (!list) { clearDropIndicators(); return; }
-
-            // Determine insert position
-            var rect   = targetRow.getBoundingClientRect();
-            var before = e.clientY < rect.top + rect.height / 2;
-
-            // Move the DOM row
-            clearDropIndicators();
-            if (before) {
-                list.insertBefore(dragSrcEl, targetRow);
-            } else {
-                targetRow.after(dragSrcEl);
-            }
-
-            // Collect new order from DOM and persist
-            var ids = Array.from(list.querySelectorAll('.match-row'))
-                .map(function (r) { return parseInt(r.dataset.tmId, 10); });
-            saveMatchOrder(ids, list);
-        }
-    }, true);
-
-    // ── API calls ─────────────────────────────────────────────────────────────
-
-    function clearDropIndicators() {
-        document.querySelectorAll('.match-row.drop-above, .match-row.drop-below')
-            .forEach(function (r) { r.classList.remove('drop-above', 'drop-below'); });
-    }
-
-    function swapReferees(tm1Id, tm2Id) {
-        fetch('/Tournaments/SwapReferees', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'tm1Id=' + tm1Id + '&tm2Id=' + tm2Id
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            document.querySelectorAll('.referee-badge').forEach(function (b) {
-                if (b.dataset.tmId == data.tm1Id) b.textContent = data.tm1Ref;
-                else if (b.dataset.tmId == data.tm2Id) b.textContent = data.tm2Ref;
-            });
-            showToast('Referees swapped: ' + data.tm1Ref + ' ↔ ' + data.tm2Ref, 'success');
-        })
-        .catch(function () {});
-    }
-
-    function saveMatchOrder(ids, list) {
-        fetch('/Tournaments/ReorderMatches', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tournamentMatchIds: ids })
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (!data.success) return;
-            // Update the #N labels in the DOM
-            data.matches.forEach(function (m) {
-                var row = list.querySelector('.match-row[data-tm-id="' + m.id + '"]');
-                if (row) {
-                    var numEl = row.querySelector('.match-num');
-                    if (numEl) numEl.textContent = '#' + m.matchNumber;
-                }
-            });
-            showToast('Match order saved.', 'success');
-        })
-        .catch(function () {});
-    }
-})();
-</script>

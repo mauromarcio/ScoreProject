@@ -622,6 +622,86 @@ public class TournamentsController : Controller
         return result;
     }
 
+    // POST: Tournaments/SwapTeamPositions
+    // Swaps any two team-position slots (home / away / ref) across any two matches.
+    // Works for same-match swaps (e.g. swap home↔away) and cross-match, cross-court swaps.
+    [HttpPost]
+    public async Task<IActionResult> SwapTeamPositions(int fromTmId, string fromPos, int toTmId, string toPos)
+    {
+        var ids = new[] { fromTmId, toTmId }.Distinct().ToArray();
+
+        var tms = await _context.TournamentMatches
+            .Include(m => m.Match)
+            .Where(m => ids.Contains(m.Id))
+            .ToListAsync();
+
+        var tm1 = tms.FirstOrDefault(m => m.Id == fromTmId);
+        var tm2 = tms.FirstOrDefault(m => m.Id == toTmId);
+
+        if (tm1?.Match == null || tm2?.Match == null) return NotFound();
+
+        static int? GetPos(TournamentMatch tm, string pos) => pos switch
+        {
+            "home" => (int?)tm.Match!.HomeTeamId,
+            "away" => (int?)tm.Match!.AwayTeamId,
+            "ref"  => tm.RefereeTeamId,
+            _      => null
+        };
+
+        static void SetPos(TournamentMatch tm, string pos, int? teamId)
+        {
+            switch (pos)
+            {
+                case "home": tm.Match!.HomeTeamId = teamId ?? 0; break;
+                case "away": tm.Match!.AwayTeamId = teamId ?? 0; break;
+                case "ref":  tm.RefereeTeamId = teamId;          break;
+            }
+        }
+
+        // Capture values BEFORE any mutation (handles same-match swaps correctly)
+        var t1 = GetPos(tm1, fromPos);
+        var t2 = GetPos(tm2, toPos);
+
+        SetPos(tm1, fromPos, t2);
+        SetPos(tm2, toPos,   t1);
+
+        await _context.SaveChangesAsync();
+
+        // Resolve names and seed numbers for the response
+        var allTeamIds = new[] { t1, t2 }
+            .Where(x => x is > 0)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToList();
+
+        var teamNames = allTeamIds.Any()
+            ? await _context.Teams
+                .Where(t => allTeamIds.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, t => t.Name)
+            : new Dictionary<int, string>();
+
+        var seedNums = allTeamIds.Any()
+            ? await _context.TournamentTeams
+                .Where(tt => tt.TournamentId == tm1.TournamentId && allTeamIds.Contains(tt.TeamId))
+                .ToDictionaryAsync(tt => tt.TeamId, tt => tt.SeedOrder)
+            : new Dictionary<int, int>();
+
+        string Name(int? id) => id is > 0 && teamNames.TryGetValue(id.Value, out var n) ? n : "—";
+        int    Num(int? id)  => id is > 0 && seedNums.TryGetValue(id.Value,  out var s) ? s : 0;
+
+        return Json(new
+        {
+            fromTmId, fromPos,
+            fromTeamId   = t2 ?? 0,
+            fromTeamName = Name(t2),
+            fromTeamNum  = Num(t2),
+            toTmId, toPos,
+            toTeamId   = t1 ?? 0,
+            toTeamName = Name(t1),
+            toTeamNum  = Num(t1)
+        });
+    }
+
     // POST: Tournaments/ReorderMatches
     // Accepts an ordered array of TournamentMatch IDs and reassigns MatchNumbers
     // starting from the smallest MatchNumber in the group (so court positions stay stable).

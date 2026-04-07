@@ -7,13 +7,68 @@
     var totalCount     = Model.PoolMatches.Count;
     int numCourts      = Math.Max(1, Model.Tournament.NumberOfCourts);
 
-    // Group pool matches by court (court 0 = matches created before multi-court was introduced → show as court 1)
     var courtGroups = Model.PoolMatches
         .GroupBy(tm => tm.CourtNumber == 0 ? 1 : tm.CourtNumber)
         .OrderBy(g => g.Key)
         .ToList();
     bool multiCourt = courtGroups.Count > 1;
+
+    // Build team-number lookup (SeedOrder) and pass to partial via ViewBag
+    var teamNumbers = Model.Tournament.TournamentTeams
+        .ToDictionary(tt => tt.TeamId, tt => tt.SeedOrder);
+    ViewBag.TeamNumbers = teamNumbers;
 }
+
+<style>
+    /* ── Match cards ─────────────────────────────────────────────────────── */
+    .match-list { }
+    .match-card {
+        padding: 8px 10px;
+        border-bottom: 1px solid #dee2e6;
+        background: #fff;
+        user-select: none;
+    }
+    .match-card:last-child { border-bottom: none; }
+    .match-card:hover { background: #f8f9fa; }
+    .match-card.is-dragging { opacity: 0.35; }
+    .match-card.drop-above  { border-top: 2px solid #0d6efd !important; }
+    .match-card.drop-below  { border-bottom: 2px solid #0d6efd !important; }
+
+    .row-drag-handle { color: #ced4da; cursor: grab; }
+    .row-drag-handle:hover { color: #6c757d; }
+
+    /* ── Team chips ──────────────────────────────────────────────────────── */
+    .team-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 7px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+        background: #f8f9fa;
+        font-size: .8rem;
+        cursor: grab;
+        white-space: nowrap;
+        transition: background .1s, border-color .1s, outline .1s;
+    }
+    .team-chip:hover      { background: #e9ecef; border-color: #adb5bd; }
+    .team-chip.is-dragging { opacity: 0.4; cursor: grabbing; }
+    .team-chip.drop-target {
+        outline: 2px solid #0d6efd;
+        background: #dce8ff;
+        border-color: #0d6efd;
+    }
+    .team-chip .team-num  { color: #6c757d; font-size: .75em; font-weight: 700; }
+    .team-chip-ref        { border-style: dashed; }
+
+    /* ── Lock state ──────────────────────────────────────────────────────── */
+    .schedule-locked .team-chip     { cursor: default; }
+    .schedule-locked .row-drag-handle { cursor: default; pointer-events: none; }
+    .schedule-locked .match-card    { cursor: default; }
+
+    /* ── Badge compact ───────────────────────────────────────────────────── */
+    .badge-status { font-size: .7em !important; }
+</style>
 
 <div class="container py-4">
     <div class="d-flex align-items-center mb-4">
@@ -26,14 +81,14 @@
         </div>
         <a asp-action="PoolPlayReport" asp-route-id="@Model.Tournament.Id"
            class="btn btn-outline-secondary btn-sm ms-2" target="_blank" title="Print pool schedule">
-            <i class="bi bi-printer me-1"></i> Print Schedule
+            <i class="bi bi-printer me-1"></i> Print
         </a>
         @if (Model.Tournament.Status == TournamentStatus.PoolPlay)
         {
             <form asp-action="GeneratePlayoffs" asp-route-id="@Model.Tournament.Id" method="post" class="ms-2">
                 <button type="submit" class="btn btn-warning btn-sm"
                         onclick="return confirm('Generate semi-finals from current standings?')">
-                    <i class="bi bi-diagram-3 me-1"></i> Generate Semi-finals
+                    <i class="bi bi-diagram-3 me-1"></i> Semi-finals
                 </button>
             </form>
         }
@@ -49,8 +104,8 @@
 
     <div class="row g-4">
 
-        <!-- Standings (always global) -->
-        <div class="col-lg-5">
+        <!-- ── Standings ──────────────────────────────────────────────── -->
+        <div class="col-lg-4">
             <div class="card">
                 <div class="card-header"><strong>Standings</strong></div>
                 <div class="table-responsive">
@@ -73,7 +128,13 @@
                                                i == 2 ? "table-warning" : i == 3 ? "table-secondary" : "";
                                 <tr class="@rowClass">
                                     <td class="fw-bold">@(i + 1)</td>
-                                    <td>@s.TeamName</td>
+                                    <td>
+                                        @if (teamNumbers.TryGetValue(s.TeamId, out var tn))
+                                        {
+                                            <span class="text-muted small me-1">T@tn</span>
+                                        }
+                                        @s.TeamName
+                                    </td>
                                     <td class="text-center fw-bold">@s.SetsWon</td>
                                     <td class="text-center">@s.PointsMade</td>
                                     <td class="text-center">@s.PointsAgainst</td>
@@ -116,46 +177,281 @@
             }
         </div>
 
-        <!-- Match List — tabbed by court when multi-court -->
-        <div class="col-lg-7">
-            @if (multiCourt)
-            {
-                <!-- Court tabs -->
-                <ul class="nav nav-tabs mb-0" id="courtTabs" role="tablist">
-                    @foreach (var cg in courtGroups)
-                    {
-                        var done  = cg.Count(m => m.Match?.Status == MatchStatus.Completed);
-                        var total = cg.Count();
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link @(cg.Key == courtGroups.First().Key ? "active" : "")"
-                                    id="tab-court-@cg.Key"
-                                    data-bs-toggle="tab"
-                                    data-bs-target="#pane-court-@cg.Key"
-                                    type="button" role="tab">
-                                Court @cg.Key
-                                <span class="badge @(done == total ? "bg-success" : "bg-secondary") ms-1">@done/@total</span>
-                            </button>
-                        </li>
-                    }
-                </ul>
-                <div class="tab-content border border-top-0 rounded-bottom" id="courtTabContent">
-                    @foreach (var cg in courtGroups)
-                    {
-                        <div class="tab-pane fade @(cg.Key == courtGroups.First().Key ? "show active" : "")"
-                             id="pane-court-@cg.Key" role="tabpanel">
+        <!-- ── Match lists (courts side-by-side) ─────────────────────── -->
+        <div class="col-lg-8">
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <strong>Pool Matches</strong>
+                    <span class="text-muted small ms-2">
+                        Drag <i class="bi bi-grip-vertical"></i> to reorder · Drag
+                        <span style="border:1px solid #dee2e6;border-radius:3px;padding:0 4px;font-size:.8em">T# Name</span>
+                        to swap teams or referee
+                    </span>
+                </div>
+                <button id="lock-toggle" class="btn btn-sm btn-outline-secondary" type="button" title="Lock schedule to prevent accidental drags">
+                    <i id="lock-icon" class="bi bi-unlock me-1"></i><span class="lock-label">Lock</span>
+                </button>
+            </div>
+
+            <div class="row g-2" id="courts-container">
+                @foreach (var cg in courtGroups)
+                {
+                    var done  = cg.Count(m => m.Match?.Status == MatchStatus.Completed);
+                    var total = cg.Count();
+                    <div class="col">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                <strong class="small">@(multiCourt ? $"Court {cg.Key}" : "Matches")</strong>
+                                <span class="badge @(done == total && total > 0 ? "bg-success" : "bg-secondary") ms-1">
+                                    @done/@total
+                                </span>
+                            </div>
                             @await Html.PartialAsync("_PoolMatchList", cg.OrderBy(m => m.MatchNumber).ToList())
                         </div>
-                    }
-                </div>
-            }
-            else
-            {
-                <div class="card">
-                    <div class="card-header"><strong>Pool Matches</strong></div>
-                    @await Html.PartialAsync("_PoolMatchList", Model.PoolMatches)
-                </div>
-            }
+                    </div>
+                }
+            </div>
         </div>
 
     </div>
 </div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+    <div id="pool-toast" class="toast align-items-center border-0" role="alert" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="pool-toast-msg"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var tournamentId = @Model.Tournament.Id;
+    var lockKey      = 'vsScheduleLocked_' + tournamentId;
+    var locked       = localStorage.getItem(lockKey) === 'true';
+
+    // ── Lock ──────────────────────────────────────────────────────────────────
+
+    function applyLock() {
+        var btn       = document.getElementById('lock-toggle');
+        var icon      = document.getElementById('lock-icon');
+        var container = document.getElementById('courts-container');
+        if (locked) {
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-warning');
+            icon.className = 'bi bi-lock-fill me-1';
+            btn.querySelector('.lock-label').textContent = 'Locked';
+            container.classList.add('schedule-locked');
+        } else {
+            btn.classList.remove('btn-warning');
+            btn.classList.add('btn-outline-secondary');
+            icon.className = 'bi bi-unlock me-1';
+            btn.querySelector('.lock-label').textContent = 'Lock';
+            container.classList.remove('schedule-locked');
+        }
+    }
+
+    document.getElementById('lock-toggle').addEventListener('click', function () {
+        locked = !locked;
+        localStorage.setItem(lockKey, locked);
+        applyLock();
+    });
+
+    applyLock();
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+
+    function showToast(msg, type) {
+        var el = document.getElementById('pool-toast');
+        if (!el || !window.bootstrap) return;
+        el.className = 'toast align-items-center border-0 text-bg-' + (type || 'success');
+        document.getElementById('pool-toast-msg').textContent = msg;
+        bootstrap.Toast.getOrCreateInstance(el, { delay: 2000 }).show();
+    }
+
+    // ── Drag state ────────────────────────────────────────────────────────────
+
+    var dragType      = null;   // 'chip' | 'row'
+    var dragSrcEl     = null;   // the dragged element
+    var dragFromHandle = false; // last mousedown was on the grip handle
+
+    // ── Mouse-down: detect handle press ───────────────────────────────────────
+
+    document.addEventListener('mousedown', function (e) {
+        dragFromHandle = !!e.target.closest('.row-drag-handle');
+    }, true);
+
+    // ── Drag-start ────────────────────────────────────────────────────────────
+
+    document.addEventListener('dragstart', function (e) {
+        if (locked) { e.preventDefault(); return; }
+
+        var chip = e.target.closest('.team-chip');
+        var card = e.target.closest('.match-card');
+
+        if (chip) {
+            // Team-chip drag (home / away / ref)
+            dragType  = 'chip';
+            dragSrcEl = chip;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', 'chip');
+            chip.classList.add('is-dragging');
+            // Stop propagation so the parent .match-card doesn't also fire dragstart
+            e.stopPropagation();
+        } else if (card && dragFromHandle) {
+            // Row drag — only from the grip handle
+            dragType  = 'row';
+            dragSrcEl = card;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', 'row');
+            setTimeout(function () { card.classList.add('is-dragging'); }, 0);
+        } else {
+            e.preventDefault(); // Ignore drags from non-handle areas
+        }
+        dragFromHandle = false;
+    }, true);
+
+    // ── Drag-end ──────────────────────────────────────────────────────────────
+
+    document.addEventListener('dragend', function () {
+        if (dragSrcEl) {
+            dragSrcEl.classList.remove('is-dragging');
+        }
+        clearChipTargets();
+        clearRowIndicators();
+        dragType = null; dragSrcEl = null;
+    }, true);
+
+    // ── Drag-over ─────────────────────────────────────────────────────────────
+
+    document.addEventListener('dragover', function (e) {
+        if (dragType === 'chip') {
+            var chip = e.target.closest('.team-chip');
+            if (chip && chip !== dragSrcEl) {
+                e.preventDefault();
+                clearChipTargets();
+                chip.classList.add('drop-target');
+            }
+        } else if (dragType === 'row') {
+            var card = e.target.closest('.match-card');
+            if (card && card !== dragSrcEl) {
+                e.preventDefault();
+                clearRowIndicators();
+                var midY = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
+                card.classList.add(e.clientY < midY ? 'drop-above' : 'drop-below');
+            }
+        }
+    }, true);
+
+    document.addEventListener('dragleave', function (e) {
+        if (dragType === 'chip') {
+            var chip = e.target.closest('.team-chip');
+            if (chip) chip.classList.remove('drop-target');
+        } else if (dragType === 'row') {
+            var card = e.target.closest('.match-card');
+            if (card) card.classList.remove('drop-above', 'drop-below');
+        }
+    }, true);
+
+    // ── Drop ──────────────────────────────────────────────────────────────────
+
+    document.addEventListener('drop', function (e) {
+        e.preventDefault();
+
+        if (dragType === 'chip') {
+            var targetChip = e.target.closest('.team-chip');
+            clearChipTargets();
+            if (!targetChip || targetChip === dragSrcEl) return;
+
+            swapTeamPositions(
+                parseInt(dragSrcEl.dataset.tmId, 10), dragSrcEl.dataset.pos,
+                parseInt(targetChip.dataset.tmId, 10), targetChip.dataset.pos
+            );
+
+        } else if (dragType === 'row') {
+            var targetCard = e.target.closest('.match-card');
+            clearRowIndicators();
+            if (!targetCard || targetCard === dragSrcEl) return;
+
+            var list = targetCard.closest('.match-list');
+            if (!list) return;
+
+            var rect   = targetCard.getBoundingClientRect();
+            var before = e.clientY < rect.top + rect.height / 2;
+            if (before) list.insertBefore(dragSrcEl, targetCard);
+            else        targetCard.after(dragSrcEl);
+
+            var ids = Array.from(list.querySelectorAll('.match-card'))
+                .map(function (c) { return parseInt(c.dataset.tmId, 10); });
+            saveMatchOrder(ids, list);
+        }
+    }, true);
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function clearChipTargets() {
+        document.querySelectorAll('.team-chip.drop-target')
+            .forEach(function (c) { c.classList.remove('drop-target'); });
+    }
+
+    function clearRowIndicators() {
+        document.querySelectorAll('.match-card.drop-above, .match-card.drop-below')
+            .forEach(function (c) { c.classList.remove('drop-above', 'drop-below'); });
+    }
+
+    // ── API ───────────────────────────────────────────────────────────────────
+
+    function swapTeamPositions(fromTmId, fromPos, toTmId, toPos) {
+        fetch('/Tournaments/SwapTeamPositions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'fromTmId=' + fromTmId + '&fromPos=' + encodeURIComponent(fromPos) +
+                  '&toTmId=' + toTmId   + '&toPos='   + encodeURIComponent(toPos)
+        })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (d) {
+            updateChip(fromTmId, fromPos, d.fromTeamId, d.fromTeamName, d.fromTeamNum);
+            updateChip(d.toTmId, d.toPos, d.toTeamId,  d.toTeamName,  d.toTeamNum);
+            showToast('Swapped: T' + d.fromTeamNum + ' ' + d.fromTeamName +
+                      ' ↔ T' + d.toTeamNum + ' ' + d.toTeamName, 'success');
+        })
+        .catch(function () { showToast('Swap failed — please try again.', 'danger'); });
+    }
+
+    function updateChip(tmId, pos, teamId, teamName, teamNum) {
+        var chip = document.querySelector(
+            '.team-chip[data-tm-id="' + tmId + '"][data-pos="' + pos + '"]');
+        if (!chip) return;
+        chip.dataset.teamId = teamId;
+        var numEl  = chip.querySelector('.team-num');
+        var nameEl = chip.querySelector('.team-name');
+        if (numEl)  numEl.textContent  = 'T' + teamNum;
+        if (nameEl) nameEl.textContent = teamName || '—';
+    }
+
+    function saveMatchOrder(ids, list) {
+        fetch('/Tournaments/ReorderMatches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tournamentMatchIds: ids })
+        })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (d) {
+            if (!d.success) return;
+            d.matches.forEach(function (m) {
+                var card = list.querySelector('.match-card[data-tm-id="' + m.id + '"]');
+                if (card) {
+                    var el = card.querySelector('.match-num-val');
+                    if (el) el.textContent = m.matchNumber;
+                }
+            });
+            showToast('Order saved.', 'success');
+        })
+        .catch(function () { showToast('Could not save order — please try again.', 'danger'); });
+    }
+
+})();
+</script>
