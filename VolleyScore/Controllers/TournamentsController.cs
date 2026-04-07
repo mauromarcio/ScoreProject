@@ -453,46 +453,39 @@ public class TournamentsController : Controller
         var rounds    = GenerateRoundRobinRounds(allTeamIds);
         var remaining = rounds.SelectMany(r => r).ToList();
 
-        // ── Step 2: Build time slots ──────────────────────────────────────────
-        // Scan `remaining` in order and pick up to numCourts conflict-free
-        // matches per slot (no team appears twice in the same slot).
-        //
-        // Because the circle method groups non-conflicting pairs into rounds,
-        // scanning in round order naturally fills each slot with matches from
-        // the same or adjacent rounds — keeping all teams engaged (zero idle
-        // when N = 3 × numCourts, e.g. 6 teams / 2 courts).
-        var teamSitStreak = allTeamIds.ToDictionary(t => t, _ => 0);
-        var slots         = new List<List<(int a, int b, int court, bool aLong, bool bLong)>>();
+        // ── Step 2: Build time slots with score-based selection ──────────────
+        // Score function enforces:
+        //   mustPlay (sitStreak >= 2)  → +2000 per team in pair (force max-2-sit rule)
+        //   hardRest (playStreak >= 2) → -5000 per team (prevent 3-in-a-row)
+        //   softRest (playStreak == 1) → -300 per team  (prefer short rest)
+        // For K=2 courts: all conflict-free pairs enumerated to find globally optimal.
+        // For K=1 or K>2: greedy by score.
+        var teamSitStreak  = allTeamIds.ToDictionary(t => t, _ => 0);
+        var teamPlayStreak = allTeamIds.ToDictionary(t => t, _ => 0);
+        var slots          = new List<List<(int a, int b, int court, bool aLong, bool bLong)>>();
 
         while (remaining.Count > 0)
         {
-            var slotTeams   = new HashSet<int>();
-            var slotMatches = new List<(int a, int b, int court, bool aLong, bool bLong)>();
+            var mustPlay = allTeamIds.Where(t => teamSitStreak[t]  >= 2).ToHashSet();
+            var hardRest = allTeamIds.Where(t => teamPlayStreak[t] >= 2).ToHashSet();
+            var softRest = allTeamIds.Where(t => teamPlayStreak[t] == 1).ToHashSet();
 
-            for (int court = 0; court < numCourts && remaining.Count > 0; court++)
-            {
-                // Find the earliest remaining match where neither team is already
-                // committed to this slot.
-                int idx = remaining.FindIndex(
-                    p => !slotTeams.Contains(p.a) && !slotTeams.Contains(p.b));
+            int MatchScore((int a, int b) p) =>
+                (mustPlay.Contains(p.a) ?  2000 : 0) + (mustPlay.Contains(p.b) ?  2000 : 0) +
+                (hardRest.Contains(p.a) ? -5000 : 0) + (hardRest.Contains(p.b) ? -5000 : 0) +
+                (softRest.Contains(p.a) ?  -300 : 0) + (softRest.Contains(p.b) ?  -300 : 0);
 
-                if (idx < 0) break; // no conflict-free match remains for this slot
+            var picks     = PickBestMatches(remaining, numCourts, MatchScore);
+            var slotTeams = picks.SelectMany(p => new[] { p.a, p.b }).ToHashSet();
 
-                var (a, b) = remaining[idx];
-                bool aLong = teamSitStreak[a] >= 3; // ★ flag: 3+ idle slots before now
-                bool bLong = teamSitStreak[b] >= 3;
+            slots.Add(picks.Select((p, i) =>
+                (p.a, p.b, i + 1, teamSitStreak[p.a] >= 3, teamSitStreak[p.b] >= 3)).ToList());
 
-                slotMatches.Add((a, b, court + 1, aLong, bLong));
-                slotTeams.Add(a);
-                slotTeams.Add(b);
-                remaining.RemoveAt(idx);
-            }
-
-            // Update idle-streak for every team
             foreach (var t in allTeamIds)
-                teamSitStreak[t] = slotTeams.Contains(t) ? 0 : teamSitStreak[t] + 1;
-
-            slots.Add(slotMatches);
+            {
+                if (slotTeams.Contains(t)) { teamPlayStreak[t]++; teamSitStreak[t]  = 0; }
+                else                       { teamSitStreak[t]++;  teamPlayStreak[t] = 0; }
+            }
         }
 
         // ── Step 3: Court-play affinity ───────────────────────────────────────
@@ -544,6 +537,119 @@ public class TournamentsController : Controller
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Picks the globally best set of up to <paramref name="numCourts"/> conflict-free
+    /// matches from <paramref name="remaining"/> (mutating the list) using the provided
+    /// score function.
+    ///
+    /// K=1 or single remaining: best single match by score.
+    /// K=2: exhaustive O(N²) enumeration for globally optimal pair.
+    /// K>2: greedy by score (N is large enough that enumeration is prohibitive).
+    /// </summary>
+    private static List<(int a, int b)> PickBestMatches(
+        List<(int a, int b)> remaining,
+        int numCourts,
+        Func<(int a, int b), int> matchScore)
+    {
+        if (remaining.Count == 0) return new();
+
+        if (numCourts == 1 || remaining.Count == 1)
+        {
+            var best = remaining
+                .Select((p, i) => (p, i))
+                .OrderByDescending(x => matchScore(x.p))
+                .ThenBy(x => x.i)
+                .First().p;
+            remaining.Remove(best);
+            return new() { best };
+        }
+
+        if (numCourts == 2)
+        {
+            // Exhaustively find the conflict-free pair with the highest combined score
+            int bestScore = int.MinValue, bestIdxSum = int.MaxValue;
+            int bi = -1, bj = -1;
+            for (int i = 0; i < remaining.Count; i++)
+            {
+                int s1 = matchScore(remaining[i]);
+                var (a1, b1) = remaining[i];
+                for (int j = i + 1; j < remaining.Count; j++)
+                {
+                    var (a2, b2) = remaining[j];
+                    if (a1 == a2 || a1 == b2 || b1 == a2 || b1 == b2) continue; // conflict
+                    int s = s1 + matchScore(remaining[j]);
+                    if (s > bestScore || (s == bestScore && i + j < bestIdxSum))
+                    {
+                        bestScore = s; bestIdxSum = i + j; bi = i; bj = j;
+                    }
+                }
+            }
+            if (bi >= 0)
+            {
+                var r1 = remaining[bi]; var r2 = remaining[bj];
+                remaining.RemoveAt(bj); remaining.RemoveAt(bi); // higher index first!
+                return new() { r1, r2 };
+            }
+            // No conflict-free pair found — return single best
+            var solo = remaining
+                .Select((p, i) => (p, i))
+                .OrderByDescending(x => matchScore(x.p))
+                .ThenBy(x => x.i)
+                .First().p;
+            remaining.Remove(solo);
+            return new() { solo };
+        }
+
+        // K>2: greedy
+        var result = new List<(int a, int b)>();
+        var used   = new HashSet<int>();
+        foreach (var p in remaining
+            .Select((p, i) => (p, i))
+            .OrderByDescending(x => matchScore(x.p))
+            .ThenBy(x => x.i)
+            .Select(x => x.p)
+            .ToList())
+        {
+            if (result.Count >= numCourts) break;
+            if (used.Contains(p.a) || used.Contains(p.b)) continue;
+            result.Add(p);
+            used.Add(p.a);
+            used.Add(p.b);
+            remaining.Remove(p);
+        }
+        return result;
+    }
+
+    // POST: Tournaments/SwapReferees
+    // Swaps the referee assignments between two TournamentMatch rows (AJAX).
+    [HttpPost]
+    public async Task<IActionResult> SwapReferees(int tm1Id, int tm2Id)
+    {
+        var tm1 = await _context.TournamentMatches
+            .Include(m => m.RefereeTeam)
+            .FirstOrDefaultAsync(m => m.Id == tm1Id);
+        var tm2 = await _context.TournamentMatches
+            .Include(m => m.RefereeTeam)
+            .FirstOrDefaultAsync(m => m.Id == tm2Id);
+
+        if (tm1 == null || tm2 == null) return NotFound();
+
+        (tm1.RefereeTeamId, tm2.RefereeTeamId) = (tm2.RefereeTeamId, tm1.RefereeTeamId);
+        await _context.SaveChangesAsync();
+
+        // Reload navigation so we can return updated names
+        await _context.Entry(tm1).Reference(m => m.RefereeTeam).LoadAsync();
+        await _context.Entry(tm2).Reference(m => m.RefereeTeam).LoadAsync();
+
+        return Json(new
+        {
+            tm1Id,
+            tm1Ref = tm1.RefereeTeam?.Name ?? "—",
+            tm2Id,
+            tm2Ref = tm2.RefereeTeam?.Name ?? "—"
+        });
     }
 
     /// <summary>

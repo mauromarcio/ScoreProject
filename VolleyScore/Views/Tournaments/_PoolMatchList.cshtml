@@ -2,7 +2,7 @@
 @model IEnumerable<VolleyScore.Models.TournamentMatch>
 @using VolleyScore.Models
 
-<div class="list-group list-group-flush">
+<div class="list-group list-group-flush" id="pool-match-list">
     @foreach (var tm in Model)
     {
         var m = tm.Match;
@@ -31,8 +31,15 @@
             <div class="d-flex justify-content-between align-items-center mt-1">
                 @if (tm.RefereeTeam != null)
                 {
-                    <span class="small text-muted">
-                        <i class="bi bi-whistle me-1"></i>Referee: <strong>@tm.RefereeTeam.Name</strong>
+                    <span class="small text-muted referee-cell" data-tm-id="@tm.Id">
+                        <i class="bi bi-whistle me-1"></i>Referee:
+                        <strong
+                            class="referee-badge"
+                            draggable="true"
+                            data-tm-id="@tm.Id"
+                            data-ref-name="@tm.RefereeTeam.Name"
+                            title="Drag to swap referee with another match"
+                            style="cursor:grab; border-bottom:1px dashed #888">@tm.RefereeTeam.Name</strong>
                     </span>
                 }
                 else { <span></span> }
@@ -51,3 +58,89 @@
         <div class="list-group-item text-muted text-center py-4">No pool matches yet.</div>
     }
 </div>
+
+<div id="ref-swap-toast" class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+    <div class="toast align-items-center text-bg-success border-0" role="alert" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="ref-swap-msg">Referees swapped.</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var dragSrcId = null;
+
+    // Use event delegation on the list container so it works after partial reloads
+    var list = document.getElementById('pool-match-list');
+    if (!list) return;
+
+    list.addEventListener('dragstart', function (e) {
+        var badge = e.target.closest('.referee-badge');
+        if (!badge) return;
+        dragSrcId = badge.dataset.tmId;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragSrcId);
+        badge.style.opacity = '0.5';
+    });
+
+    list.addEventListener('dragend', function (e) {
+        var badge = e.target.closest('.referee-badge');
+        if (badge) badge.style.opacity = '';
+        dragSrcId = null;
+    });
+
+    list.addEventListener('dragover', function (e) {
+        if (e.target.closest('.referee-badge')) e.preventDefault();
+    });
+
+    list.addEventListener('drop', function (e) {
+        var badge = e.target.closest('.referee-badge');
+        if (!badge) return;
+        e.preventDefault();
+
+        var dropId = badge.dataset.tmId;
+        if (!dragSrcId || dragSrcId === dropId) return;
+
+        var tm1Id = parseInt(dragSrcId, 10);
+        var tm2Id = parseInt(dropId, 10);
+
+        var token = document.querySelector('input[name="__RequestVerificationToken"]');
+
+        fetch('/Tournaments/SwapReferees', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'RequestVerificationToken': token ? token.value : ''
+            },
+            body: 'tm1Id=' + tm1Id + '&tm2Id=' + tm2Id
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            // Update the two badges in the DOM without a page reload
+            list.querySelectorAll('.referee-badge').forEach(function (b) {
+                var id = b.dataset.tmId;
+                if (id == data.tm1Id) {
+                    b.textContent = data.tm1Ref;
+                    b.dataset.refName = data.tm1Ref;
+                } else if (id == data.tm2Id) {
+                    b.textContent = data.tm2Ref;
+                    b.dataset.refName = data.tm2Ref;
+                }
+            });
+            // Show a brief success toast
+            var toastEl = document.querySelector('#ref-swap-toast .toast');
+            if (toastEl && window.bootstrap) {
+                document.getElementById('ref-swap-msg').textContent =
+                    'Referees swapped: ' + data.tm1Ref + ' ↔ ' + data.tm2Ref;
+                var t = new bootstrap.Toast(toastEl, { delay: 2500 });
+                t.show();
+            }
+        })
+        .catch(function () {});
+
+        dragSrcId = null;
+    });
+})();
+</script>
