@@ -173,6 +173,17 @@
                     </div>
                 </div>
             }
+
+            <!-- ── Schedule stats (live, updates with every drag) ────── -->
+            <div class="card mt-3" id="schedule-stats-card">
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <strong class="small">Schedule Stats</strong>
+                    <span class="badge bg-secondary" style="font-size:.65em;letter-spacing:.03em">LIVE</span>
+                </div>
+                <div class="card-body p-0" id="schedule-stats-body">
+                    <div class="text-muted text-center small py-3">Loading…</div>
+                </div>
+            </div>
         </div>
 
         <!-- ── Match lists (courts side-by-side) ─────────────────────── -->
@@ -227,9 +238,11 @@
 
 <script>
 (function () {
-    var tournamentId = @Model.Tournament.Id;
-    var lockKey      = 'vsScheduleLocked_' + tournamentId;
-    var locked       = localStorage.getItem(lockKey) === 'true';
+    var tournamentId  = @Model.Tournament.Id;
+    var numTeams      = @Model.Tournament.TournamentTeams.Count;
+    var expectedPlays = numTeams - 1;   // full round-robin: each team plays vs every other once
+    var lockKey       = 'vsScheduleLocked_' + tournamentId;
+    var locked        = localStorage.getItem(lockKey) === 'true';
 
     // ── Lock ──────────────────────────────────────────────────────────────────
 
@@ -259,6 +272,7 @@
     });
 
     applyLock();
+    renderStats(); // initial render
 
     // ── Toast ─────────────────────────────────────────────────────────────────
 
@@ -415,6 +429,7 @@
             updateChip(d.toTmId, d.toPos, d.toTeamId,  d.toTeamName,  d.toTeamNum);
             showToast('Swapped: T' + d.fromTeamNum + ' ' + d.fromTeamName +
                       ' ↔ T' + d.toTeamNum + ' ' + d.toTeamName, 'success');
+            renderStats();
         })
         .catch(function () { showToast('Swap failed — please try again.', 'danger'); });
     }
@@ -449,6 +464,102 @@
             showToast('Order saved.', 'success');
         })
         .catch(function () { showToast('Could not save order — please try again.', 'danger'); });
+    }
+
+    // ── Schedule stats ────────────────────────────────────────────────────────
+
+    function computeStats() {
+        // Collect distinct court numbers from DOM
+        var courtsSet = {};
+        document.querySelectorAll('.match-card[data-court]').forEach(function (c) {
+            courtsSet[parseInt(c.dataset.court) || 1] = true;
+        });
+        var courts = Object.keys(courtsSet).map(Number).sort(function (a, b) { return a - b; });
+
+        var teams = {}; // teamId → { num, name, plays:{courtNum→count}, refs }
+
+        function getOrCreate(chip) {
+            var id = chip.dataset.teamId;
+            if (!id || id === '0') return null;
+            if (!teams[id]) {
+                var numEl  = chip.querySelector('.team-num');
+                var nameEl = chip.querySelector('.team-name');
+                teams[id] = {
+                    id:   id,
+                    num:  numEl  ? parseInt(numEl.textContent.replace(/\D/g, ''), 10) : 0,
+                    name: nameEl ? nameEl.textContent.trim() : '—',
+                    plays: {},
+                    refs:  0
+                };
+            }
+            return teams[id];
+        }
+
+        document.querySelectorAll('.match-card').forEach(function (card) {
+            var court = parseInt(card.dataset.court, 10) || 1;
+            ['home', 'away'].forEach(function (pos) {
+                var chip = card.querySelector('.team-chip[data-pos="' + pos + '"]');
+                if (!chip) return;
+                var t = getOrCreate(chip);
+                if (t) t.plays[court] = (t.plays[court] || 0) + 1;
+            });
+            var ref = card.querySelector('.team-chip[data-pos="ref"]');
+            if (ref) { var t = getOrCreate(ref); if (t) t.refs++; }
+        });
+
+        return { teams: teams, courts: courts };
+    }
+
+    function renderStats() {
+        var body = document.getElementById('schedule-stats-body');
+        if (!body) return;
+
+        var data   = computeStats();
+        var courts = data.courts;
+        var teams  = Object.values(data.teams)
+            .sort(function (a, b) { return a.num - b.num; });
+
+        if (teams.length === 0) {
+            body.innerHTML = '<div class="text-muted small text-center py-3">No matches yet.</div>';
+            return;
+        }
+
+        var html = '<div class="table-responsive">'
+            + '<table class="table table-sm table-bordered mb-0" style="font-size:.78em">'
+            + '<thead class="table-light"><tr>'
+            + '<th>Team</th>'
+            + '<th class="text-center" title="Total matches as player">Plays</th>';
+
+        courts.forEach(function (c) {
+            html += '<th class="text-center" title="Plays on court ' + c + '">C' + c + '</th>';
+        });
+        html += '<th class="text-center" title="Times refereeing">Refs</th>'
+             + '</tr></thead><tbody>';
+
+        teams.forEach(function (t) {
+            var total = courts.reduce(function (s, c) { return s + (t.plays[c] || 0); }, 0);
+            var ok    = total === expectedPlays;
+            var badge = '<span class="badge ' + (ok ? 'bg-success' : 'bg-danger')
+                + '" title="' + (ok ? '' : 'Expected ' + expectedPlays) + '">'
+                + total + '</span>';
+
+            html += '<tr>'
+                + '<td class="text-nowrap"><span class="text-muted me-1" style="font-size:.85em">T'
+                + t.num + '</span>' + escHtml(t.name) + '</td>'
+                + '<td class="text-center">' + badge + '</td>';
+
+            courts.forEach(function (c) {
+                html += '<td class="text-center">' + (t.plays[c] || 0) + '</td>';
+            });
+            html += '<td class="text-center text-muted">' + t.refs + '</td></tr>';
+        });
+
+        html += '</tbody></table></div>';
+        body.innerHTML = html;
+    }
+
+    function escHtml(s) {
+        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
 })();

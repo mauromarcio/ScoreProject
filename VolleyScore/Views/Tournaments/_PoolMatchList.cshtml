@@ -18,7 +18,7 @@
         int homeNum = TNum(m.HomeTeamId);
         int awayNum = TNum(m.AwayTeamId);
         int refNum  = tm.RefereeTeamId.HasValue ? TNum(tm.RefereeTeamId.Value) : 0;
-        <div class="match-card" draggable="true" data-tm-id="@tm.Id" data-match-id="@m.Id">
+        <div class="match-card" draggable="true" data-tm-id="@tm.Id" data-match-id="@m.Id" data-court="@(tm.CourtNumber == 0 ? 1 : tm.CourtNumber)">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-1">
                     <span class="row-drag-handle" title="Drag to reorder match">
