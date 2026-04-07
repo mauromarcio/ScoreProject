@@ -622,6 +622,36 @@ public class TournamentsController : Controller
         return result;
     }
 
+    // POST: Tournaments/ReorderMatches
+    // Accepts an ordered array of TournamentMatch IDs and reassigns MatchNumbers
+    // starting from the smallest MatchNumber in the group (so court positions stay stable).
+    [HttpPost]
+    public async Task<IActionResult> ReorderMatches([FromBody] ReorderMatchesRequest req)
+    {
+        if (req?.TournamentMatchIds == null || req.TournamentMatchIds.Length == 0)
+            return BadRequest(new { success = false });
+
+        var matches = await _context.TournamentMatches
+            .Where(tm => req.TournamentMatchIds.Contains(tm.Id))
+            .ToListAsync();
+
+        if (matches.Count == 0) return BadRequest(new { success = false });
+
+        int baseNumber = matches.Min(m => m.MatchNumber);
+        var updated    = new List<object>();
+
+        for (int i = 0; i < req.TournamentMatchIds.Length; i++)
+        {
+            var tm = matches.FirstOrDefault(m => m.Id == req.TournamentMatchIds[i]);
+            if (tm == null) continue;
+            tm.MatchNumber = baseNumber + i;
+            updated.Add(new { id = tm.Id, matchNumber = tm.MatchNumber });
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true, matches = updated });
+    }
+
     // POST: Tournaments/SwapReferees
     // Swaps the referee assignments between two TournamentMatch rows (AJAX).
     [HttpPost]
@@ -842,4 +872,10 @@ public class ReorderTeamsRequest
 {
     public int TournamentId { get; set; }
     public int[] TeamIds { get; set; } = Array.Empty<int>();
+}
+
+/// <summary>AJAX body for reordering pool matches via drag-drop</summary>
+public class ReorderMatchesRequest
+{
+    public int[] TournamentMatchIds { get; set; } = Array.Empty<int>();
 }
