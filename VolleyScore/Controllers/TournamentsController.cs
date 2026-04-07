@@ -450,7 +450,7 @@ public class TournamentsController : Controller
     /// - Court-affinity reffing: teams ref the court they play on most; they are
     ///   only assigned to a different court when no same-court candidate exists.
     /// </summary>
-    private static List<(int home, int away, int referee, int court)> BuildMultiCourtSchedule(
+    private static List<(int home, int away, int referee, int court, bool homeLong, bool awayLong)> BuildMultiCourtSchedule(
         List<int> allTeamIds, int numCourts)
     {
         numCourts = Math.Max(1, numCourts);
