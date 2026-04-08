@@ -13,6 +13,14 @@
         .GroupBy(tm => tm.CourtNumber == 0 ? 1 : tm.CourtNumber)
         .OrderBy(g => g.Key)
         .ToList();
+
+    // Team seed-order lookup for T# prefix
+    var rptTeamNums = Model.Tournament.TournamentTeams
+        .ToDictionary(tt => tt.TeamId, tt => tt.SeedOrder);
+    Func<int, string> TPrefix = id => {
+        int n = rptTeamNums.GetValueOrDefault(id, 0);
+        return n > 0 ? $"T{n} " : "";
+    };
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -62,6 +70,7 @@
 
         .done td  { background: #f0f8f0; }
         .set-score { font-size: 10px; color: #555; }
+        .t-num { color: #888; font-size: 9.5px; font-weight: 700; margin-right: 2px; }
 
         @@media print {
             .no-print { display: none !important; }
@@ -128,10 +137,10 @@
                     string rowClass = completed ? "done" : "";
                     <tr class="@rowClass">
                         <td class="col-num">@tm.MatchNumber</td>
-                        <td class="col-team">@m.HomeTeam?.Name@if (tm.HomeTeamLongWait) {<span title="Long wait (3 idle slots)" style="color:#c8a000;margin-left:3px">★</span>}</td>
+                        <td class="col-team"><span class="t-num">@TPrefix(m.HomeTeamId)</span>@m.HomeTeam?.Name@if (tm.HomeTeamLongWait) {<span title="Long wait (3 idle slots)" style="color:#c8a000;margin-left:3px">★</span>}</td>
                         <td class="col-vs">vs</td>
-                        <td class="col-team">@m.AwayTeam?.Name@if (tm.AwayTeamLongWait) {<span title="Long wait (3 idle slots)" style="color:#c8a000;margin-left:3px">★</span>}</td>
-                        <td class="col-ref">@(tm.RefereeTeam?.Name ?? "—")</td>
+                        <td class="col-team"><span class="t-num">@TPrefix(m.AwayTeamId)</span>@m.AwayTeam?.Name@if (tm.AwayTeamLongWait) {<span title="Long wait (3 idle slots)" style="color:#c8a000;margin-left:3px">★</span>}</td>
+                        <td class="col-ref">@(tm.RefereeTeamId.HasValue ? TPrefix(tm.RefereeTeamId.Value) + (tm.RefereeTeam?.Name ?? "—") : "—")</td>
                         <td class="col-set">
                             @if (completed)
                             {

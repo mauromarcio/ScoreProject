@@ -262,7 +262,7 @@
             $('#btnStartMatch').hide();
             $('#matchStatusText').text('Completed').removeClass('bg-secondary bg-success').addClass('bg-dark');
             $('#matchCompleteOverlay').show();
-            $('#winnerText').text(result.winnerName + ' Wins!');
+            $('#winnerText').text(result.winnerName ? result.winnerName + ' Wins!' : 'Match Complete');
             $('#winnerSubText').text('Match complete – ' +
                 result.homeSetsWon + ':' + result.awaySetsWon + ' sets');
         } else if (result.setCompleted) {

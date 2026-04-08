@@ -36,7 +36,9 @@
                     {
                         <span class="small fw-bold">@homeSets–@awaySets</span>
                     }
-                    <span class="badge bg-@statusClass badge-status">@m.Status</span>
+                    <a asp-controller="Matches" asp-action="Court" asp-route-id="@m.Id"
+                       draggable="false"
+                       class="badge bg-@statusClass badge-status text-decoration-none">@m.Status</a>
                 </div>
             </div>
 

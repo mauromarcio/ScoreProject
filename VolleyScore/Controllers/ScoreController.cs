@@ -185,8 +185,11 @@ public class ScoreController : Controller
             int homeS = currentSet.HomeScore;
             int awayS = currentSet.AwayScore;
 
-            bool homeWinsSet = homeS >= winThreshold && (homeS - awayS) >= 2;
-            bool awayWinsSet = awayS >= winThreshold && (awayS - homeS) >= 2;
+            // When a cap is configured, the first team to reach the cap wins with any lead (1 pt).
+            // Without a cap, standard volleyball requires a 2-point lead.
+            int leadRequired = (match.SetCap.HasValue && match.SetCap.Value > 0) ? 1 : 2;
+            bool homeWinsSet = homeS >= winThreshold && (homeS - awayS) >= leadRequired;
+            bool awayWinsSet = awayS >= winThreshold && (awayS - homeS) >= leadRequired;
 
             if (homeWinsSet || awayWinsSet)
             {
