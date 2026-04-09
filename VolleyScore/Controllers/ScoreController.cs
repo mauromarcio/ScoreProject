@@ -174,20 +174,24 @@ public class ScoreController : Controller
             // ── Check for set win ─────────────────────────────────────────────
             // Deciding set (odd TotalSets > 1, last set) plays to 15.
             // Even TotalSets (best-of-2 / best-of-4): all sets play to 25 — no tiebreaker.
-            // A SetCap (e.g. 21) caps the threshold for pool play.
+            // When a SetCap is configured it REPLACES the standard threshold entirely:
+            //   cap=21 → every set ends at 21  (cap < 25, threshold lowered)
+            //   cap=27 → every set ends at 27  (cap > 25, threshold raised — 25 is NOT a win)
+            // Without a cap, standard 2-point lead is required.
+            // With a cap, first team to reach the cap wins (1-point lead sufficient).
             bool isDecidingSet = match!.TotalSets % 2 == 1
                                   && match.TotalSets > 1
                                   && match.CurrentSetNumber == match.MaxSets;
-            int winThreshold = isDecidingSet ? 15 : 25;
-            if (match.SetCap.HasValue && match.SetCap.Value > 0)
-                winThreshold = Math.Min(winThreshold, match.SetCap.Value);
+            bool hasCap = match.SetCap.HasValue && match.SetCap.Value > 0;
+            int winThreshold = hasCap ? match.SetCap.Value
+                                      : (isDecidingSet ? 15 : 25);
 
             int homeS = currentSet.HomeScore;
             int awayS = currentSet.AwayScore;
 
-            // When a cap is configured, the first team to reach the cap wins with any lead (1 pt).
+            // When a cap is configured, first team to reach it wins with a 1-point lead.
             // Without a cap, standard volleyball requires a 2-point lead.
-            int leadRequired = (match.SetCap.HasValue && match.SetCap.Value > 0) ? 1 : 2;
+            int leadRequired = hasCap ? 1 : 2;
             bool homeWinsSet = homeS >= winThreshold && (homeS - awayS) >= leadRequired;
             bool awayWinsSet = awayS >= winThreshold && (awayS - homeS) >= leadRequired;
 
