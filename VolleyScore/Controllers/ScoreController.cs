@@ -172,28 +172,35 @@ public class ScoreController : Controller
             }
 
             // ── Check for set win ─────────────────────────────────────────────
-            // Deciding set (odd TotalSets > 1, last set) plays to 15.
-            // Even TotalSets (best-of-2 / best-of-4): all sets play to 25 — no tiebreaker.
-            // When a SetCap is configured it REPLACES the standard threshold entirely:
-            //   cap=21 → every set ends at 21  (cap < 25, threshold lowered)
-            //   cap=27 → every set ends at 27  (cap > 25, threshold raised — 25 is NOT a win)
-            // Without a cap, standard 2-point lead is required.
-            // With a cap, first team to reach the cap wins (1-point lead sufficient).
+            // Standard rule: reach the threshold (25 regular / 15 deciding) with a 2-point lead.
+            // Cap rule (when SetCap is configured): reach the cap score with only a 1-point lead.
+            //   These two conditions are independent and either one ends the set:
+            //
+            //   cap=21 (below 25) → cap fires first; set ends at 21 with 1-pt lead.
+            //                        Standard threshold (25) is never reached.
+            //   cap=27 (above 25) → standard fires at 25/26/… whenever lead >= 2.
+            //                        If tied (e.g. 25-25, 26-26), play continues until
+            //                        one team reaches 27 with any lead (1-pt sufficient).
+            //   no cap            → only standard 25/15 with 2-pt lead applies.
             bool isDecidingSet = match!.TotalSets % 2 == 1
                                   && match.TotalSets > 1
                                   && match.CurrentSetNumber == match.MaxSets;
             bool hasCap = match.SetCap.HasValue && match.SetCap.Value > 0;
-            int winThreshold = hasCap ? match.SetCap.Value
-                                      : (isDecidingSet ? 15 : 25);
+            int standardThreshold = isDecidingSet ? 15 : 25;
+            int capValue = hasCap ? match.SetCap!.Value : int.MaxValue;
 
             int homeS = currentSet.HomeScore;
             int awayS = currentSet.AwayScore;
 
-            // When a cap is configured, first team to reach it wins with a 1-point lead.
-            // Without a cap, standard volleyball requires a 2-point lead.
-            int leadRequired = hasCap ? 1 : 2;
-            bool homeWinsSet = homeS >= winThreshold && (homeS - awayS) >= leadRequired;
-            bool awayWinsSet = awayS >= winThreshold && (awayS - homeS) >= leadRequired;
+            // Condition A — normal 2-pt lead at/above standard threshold
+            bool homeWinsStd = homeS >= standardThreshold && (homeS - awayS) >= 2;
+            bool awayWinsStd = awayS >= standardThreshold && (awayS - homeS) >= 2;
+            // Condition B — first to reach the cap wins (1-pt lead sufficient)
+            bool homeWinsCap = hasCap && homeS >= capValue && (homeS - awayS) >= 1;
+            bool awayWinsCap = hasCap && awayS >= capValue && (awayS - homeS) >= 1;
+
+            bool homeWinsSet = homeWinsStd || homeWinsCap;
+            bool awayWinsSet = awayWinsStd || awayWinsCap;
 
             if (homeWinsSet || awayWinsSet)
             {
