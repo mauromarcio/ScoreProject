@@ -431,6 +431,7 @@
 
     var TALLY_MAX = 36;   // highest point shown on the tally sheet
     var tallyMinimised = false;
+    var tallyVisible   = false;
 
     function initTallyPanel() {
         buildTallyTable();
@@ -569,7 +570,8 @@
             sessionStorage.setItem('tallyPanel', JSON.stringify({
                 left: $p.css('left'), top: $p.css('top'),
                 width: $p.outerWidth(), height: $p.outerHeight(),
-                minimised: tallyMinimised
+                minimised: tallyMinimised,
+                visible: tallyVisible
             }));
         } catch(e) {}
     }
@@ -587,8 +589,20 @@
                 tallyMinimised = false;  // toggleTallyContent will flip it
                 toggleTallyContent();
             }
+            if (saved.visible) {
+                tallyVisible = false;    // toggleTallyPanel will flip it
+                toggleTallyPanel();
+            }
         } catch(e) {}
     }
+
+    // Show / hide the entire tally panel
+    window.toggleTallyPanel = function () {
+        tallyVisible = !tallyVisible;
+        $('#scoreTallyPanel').toggle(tallyVisible);
+        $('#btnToggleTally').toggleClass('active', tallyVisible);
+        saveTallyPosition();
+    };
 
     // Minimise / expand toggle
     window.toggleTallyContent = function () {

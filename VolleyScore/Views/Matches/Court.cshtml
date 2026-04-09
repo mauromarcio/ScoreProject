@@ -258,6 +258,10 @@
                     style="@(Model.Match.Status == MatchStatus.InProgress || Model.Match.Status == MatchStatus.Completed ? "display:none" : "")">
                 <i class="bi bi-play-fill me-1"></i> Start Match
             </button>
+            <button id="btnToggleTally" class="btn btn-outline-info toolbar-btn"
+                    onclick="toggleTallyPanel()">
+                <i class="bi bi-table me-1"></i> Score Tally
+            </button>
         </div>
         <div class="d-flex align-items-center gap-3">
             <span id="matchStatusText" class="badge fs-6 @(Model.Match.Status == MatchStatus.InProgress ? "bg-success" : Model.Match.Status == MatchStatus.Completed ? "bg-dark" : "bg-secondary")">
@@ -272,7 +276,7 @@
 </div>
 
 <!-- ── Score Tally Panel (floating, draggable, resizable) ─────────────── -->
-<div id="scoreTallyPanel" class="score-tally-panel">
+<div id="scoreTallyPanel" class="score-tally-panel" style="display:none">
     <div class="tally-handle" id="tallyHandle">
         <span class="tally-title">Score Tally</span>
         <div class="tally-handle-btns">
