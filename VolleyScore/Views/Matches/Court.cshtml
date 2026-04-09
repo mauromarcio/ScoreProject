@@ -336,8 +336,6 @@
 </div>
 
 @section Scripts {
-    <!-- SignalR client - no SRI hash to prevent silent load failures -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"
-            crossorigin="anonymous"></script>
+    <script src="~/lib/signalr/signalr.min.js"></script>
     <script src="~/js/court.js" asp-append-version="true"></script>
 }
