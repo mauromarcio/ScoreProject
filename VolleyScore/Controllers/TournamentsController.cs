@@ -665,6 +665,35 @@ public class TournamentsController : Controller
         SetPos(tm1, fromPos, t2);
         SetPos(tm2, toPos,   t1);
 
+        // Regenerate MatchReference for any match whose playing teams changed
+        var matchesToResync = new List<(Match match, TournamentMatch tm)>();
+        if (fromPos != "ref" && tm1.Match != null)
+            matchesToResync.Add((tm1.Match, tm1));
+        if (toPos != "ref" && tm2.Match != null && !ReferenceEquals(tm1.Match, tm2.Match))
+            matchesToResync.Add((tm2.Match, tm2));
+
+        if (matchesToResync.Count > 0)
+        {
+            var tournament = await _context.Tournaments.FindAsync(tm1.TournamentId);
+            var syncTeamIds = matchesToResync
+                .SelectMany(x => new[] { x.match.HomeTeamId, x.match.AwayTeamId })
+                .Distinct().ToList();
+            var syncTeamNames = await _context.Teams
+                .Where(t => syncTeamIds.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, t => t.Name);
+
+            bool multiCourt = tournament != null && tournament.NumberOfCourts > 1;
+            foreach (var (match, tm) in matchesToResync)
+            {
+                string home = syncTeamNames.GetValueOrDefault(match.HomeTeamId, "?");
+                string away = syncTeamNames.GetValueOrDefault(match.AwayTeamId, "?");
+                int court   = tm.CourtNumber == 0 ? 1 : tm.CourtNumber;
+                match.MatchReference = multiCourt
+                    ? $"{tournament!.Name} – C{court}·{tm.MatchNumber}: {home} vs {away}"
+                    : $"{tournament!.Name} – Pool {tm.MatchNumber}: {home} vs {away}";
+            }
+        }
+
         await _context.SaveChangesAsync();
 
         // Resolve names and seed numbers for the response
