@@ -258,6 +258,11 @@
                     style="@(Model.Match.Status == MatchStatus.InProgress || Model.Match.Status == MatchStatus.Completed ? "display:none" : "")">
                 <i class="bi bi-play-fill me-1"></i> Start Match
             </button>
+            <button id="btnToggleServe" class="btn btn-outline-warning toolbar-btn"
+                    onclick="toggleFirstServe()"
+                    @(Model.Match.Status != MatchStatus.Setup ? "disabled" : "")>
+                <i class="bi bi-volleyball me-1"></i> First Serve: <span id="serveTeamLabel">@(leftIsServing ? leftTeam.Name : rightTeam.Name)</span>
+            </button>
             <button id="btnToggleTally" class="btn btn-outline-info toolbar-btn"
                     onclick="toggleTallyPanel()">
                 <i class="bi bi-table me-1"></i> Score Tally

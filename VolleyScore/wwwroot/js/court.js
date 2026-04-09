@@ -383,6 +383,27 @@
         });
     };
 
+    // ── Toggle first serve (Setup only) ──────────────────────────────────────
+    window.toggleFirstServe = function () {
+        if (matchStatus !== 'Setup') return;
+        var newTeam = homeIsServing ? 'Away' : 'Home';
+        $.ajax({
+            url: '/Score/SetServing',
+            method: 'POST',
+            contentType: 'application/json',
+            headers: { 'RequestVerificationToken': getAntiForgeryToken() },
+            data: JSON.stringify({ matchId: matchId, team: newTeam }),
+            success: function (result) {
+                if (!result.success) { showError(result.error || 'Could not change serve.'); return; }
+                homeIsServing = result.homeIsServing;
+                var leftIsServing = homeTeamOnLeft ? homeIsServing : !homeIsServing;
+                updateServingBadge(leftIsServing);
+                $('#serveTeamLabel').text(leftIsServing ? $('#leftTeamName').text() : $('#rightTeamName').text());
+            },
+            error: function () { showError('Network error.'); }
+        });
+    };
+
     // ── Start match ───────────────────────────────────────────────────────────
     window.startMatch = function () {
         $.ajax({
@@ -393,6 +414,7 @@
                 if (result.success) {
                     matchStatus = 'InProgress';
                     $('#btnStartMatch').hide();
+                    $('#btnToggleServe').prop('disabled', true);
                     $('#matchStatusText').text('InProgress')
                         .removeClass('bg-secondary bg-dark').addClass('bg-success');
                 } else {
