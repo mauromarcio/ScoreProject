@@ -22,7 +22,7 @@
         </div>
 
         <!-- Quick nav cards -->
-        <div class="col-md-4">
+        <div class="col-6 col-md-3">
             <a asp-controller="Matches" asp-action="Index" class="text-decoration-none">
                 <div class="card h-100 text-center p-3">
                     <div class="card-body">
@@ -33,7 +33,7 @@
                 </div>
             </a>
         </div>
-        <div class="col-md-4">
+        <div class="col-6 col-md-3">
             <a asp-controller="Teams" asp-action="Index" class="text-decoration-none">
                 <div class="card h-100 text-center p-3">
                     <div class="card-body">
@@ -44,13 +44,24 @@
                 </div>
             </a>
         </div>
-        <div class="col-md-4">
+        <div class="col-6 col-md-3">
             <a asp-controller="Players" asp-action="Index" class="text-decoration-none">
                 <div class="card h-100 text-center p-3">
                     <div class="card-body">
                         <i class="bi bi-person-badge-fill text-success" style="font-size:2.5rem"></i>
                         <h5 class="mt-3 mb-1">Players</h5>
                         <p class="text-muted small">Add players, assign jersey numbers and teams</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a asp-controller="Tournaments" asp-action="Index" class="text-decoration-none">
+                <div class="card h-100 text-center p-3" style="background:linear-gradient(135deg,#0d1b3e,#1a3a6e);border-color:#2a5a9e">
+                    <div class="card-body">
+                        <i class="bi bi-diagram-3-fill text-info" style="font-size:2.5rem"></i>
+                        <h5 class="mt-3 mb-1 text-white">Bracket Visualizer</h5>
+                        <p class="small" style="color:#8ab4d8">Live standings &amp; playoff bracket for any tournament</p>
                     </div>
                 </div>
             </a>

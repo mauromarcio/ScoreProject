@@ -206,6 +206,98 @@ public class TournamentsController : Controller
         return View(vm);
     }
 
+    // GET: Tournaments/LiveBracket/5 — full-screen live bracket visualizer
+    public async Task<IActionResult> LiveBracket(int id)
+    {
+        var tournament = await LoadTournament(id);
+        if (tournament == null) return NotFound();
+
+        var vm = BuildBracketViewModel(tournament);
+        return View(vm);
+    }
+
+    // GET: Tournaments/LiveData/5 — JSON polling endpoint for the live visualizer
+    [HttpGet]
+    public async Task<IActionResult> LiveData(int id)
+    {
+        var tournament = await LoadTournament(id);
+        if (tournament == null) return NotFound();
+
+        var standings = ComputeStandings(tournament);
+
+        // Active match scores — all InProgress matches in this tournament
+        var activeMatches = tournament.TournamentMatches
+            .Where(tm => tm.Match?.Status == MatchStatus.InProgress)
+            .OrderBy(tm => tm.CourtNumber).ThenBy(tm => tm.MatchNumber)
+            .Select(tm =>
+            {
+                var m = tm.Match!;
+                var cs = m.Sets.FirstOrDefault(s => s.SetNumber == m.CurrentSetNumber);
+                return new
+                {
+                    matchId     = m.Id,
+                    stage       = tm.Stage.ToString(),
+                    matchNumber = tm.MatchNumber,
+                    courtNumber = tm.CourtNumber,
+                    homeTeam    = m.HomeTeam?.Name ?? "",
+                    awayTeam    = m.AwayTeam?.Name ?? "",
+                    homeScore   = cs?.HomeScore ?? 0,
+                    awayScore   = cs?.AwayScore ?? 0,
+                    homeSets    = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId),
+                    awaySets    = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId),
+                    setNumber   = m.CurrentSetNumber
+                };
+            }).ToList();
+
+        static object MatchDto(Match m)
+        {
+            var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+            var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+            int? winnerId = m.Status == MatchStatus.Completed
+                ? (homeSets >= m.SetsToWin ? m.HomeTeamId : (int?)m.AwayTeamId)
+                : null;
+            return new
+            {
+                matchId    = m.Id,
+                homeTeam   = m.HomeTeam?.Name ?? "",
+                awayTeam   = m.AwayTeam?.Name ?? "",
+                homeSets,
+                awaySets,
+                status     = m.Status.ToString(),
+                winnerName = winnerId == m.HomeTeamId ? m.HomeTeam?.Name :
+                             winnerId == m.AwayTeamId ? m.AwayTeam?.Name : null
+            };
+        }
+
+        var sfTms = tournament.TournamentMatches
+            .Where(tm => tm.Stage == TournamentStage.Semifinal)
+            .OrderBy(tm => tm.MatchNumber).ToList();
+
+        var fmTm  = tournament.TournamentMatches.FirstOrDefault(tm => tm.Stage == TournamentStage.Final);
+        var tpTm  = tournament.TournamentMatches.FirstOrDefault(tm => tm.Stage == TournamentStage.ThirdPlace);
+
+        return Json(new
+        {
+            standings = standings.Select((s, i) => new
+            {
+                rank          = i + 1,
+                teamName      = s.TeamName,
+                matchesPlayed = s.MatchesPlayed,
+                setsWon       = s.SetsWon,
+                pointsMade    = s.PointsMade,
+                pointsAgainst = s.PointsAgainst,
+                ratio         = s.PointsRatio == double.MaxValue ? 9999.0 : Math.Round(s.PointsRatio, 3)
+            }),
+            activeMatches,
+            semifinals     = sfTms.Select(tm => tm.Match == null ? null : (object?)MatchDto(tm.Match)).ToList(),
+            finalMatch     = fmTm?.Match == null ? null : (object?)MatchDto(fmTm.Match),
+            thirdPlaceMatch = tpTm?.Match == null ? null : (object?)MatchDto(tpTm.Match),
+            tournamentStatus = tournament.Status.ToString(),
+            poolTotal = tournament.TournamentMatches.Count(tm => tm.Stage == TournamentStage.Pool),
+            poolDone  = tournament.TournamentMatches.Count(tm => tm.Stage == TournamentStage.Pool && tm.Match?.Status == MatchStatus.Completed)
+        });
+    }
+
     // POST: Tournaments/GeneratePlayoffs/5
     // Creates semi-final matches based on pool standings (top 4 teams)
     [HttpPost]
