@@ -329,11 +329,10 @@ public class MatchesController : Controller
         var homeIds = match.HomeTeam!.Players.Select(p => p.Id).ToList();
         var awayIds = match.AwayTeam!.Players.Select(p => p.Id).ToList();
 
-        var homeTask = SeedSideLineupAsync(match.Id, homeIds, "Home");
-        var awayTask = SeedSideLineupAsync(match.Id, awayIds, "Away");
-        await Task.WhenAll(homeTask, awayTask);
+        bool anyHome = await SeedSideLineupAsync(match.Id, homeIds, "Home");
+        bool anyAway = await SeedSideLineupAsync(match.Id, awayIds, "Away");
 
-        if (homeTask.Result || awayTask.Result)
+        if (anyHome || anyAway)
             await _context.SaveChangesAsync();
     }
 
