@@ -83,6 +83,112 @@
         });
     }
 
+    // ── Touch Drag & Drop (tablet support) ───────────────────────────────────
+    // Mirrors the jQuery UI draggable/droppable behaviour using touch events.
+    // Only active when a .player-badge is the initial touch target.
+    function initTouchDragDrop() {
+        var active    = false;   // true while a badge is being dragged by touch
+        var clone     = null;    // floating DOM clone that follows the finger
+        var srcBadge  = null;    // the original badge element
+        var lastSlot  = null;    // last .position-slot with hover highlight
+        var offsetX   = 0;       // finger offset from badge top-left
+        var offsetY   = 0;
+        var lastTapEl = null;    // for double-tap removal
+        var lastTapMs = 0;
+
+        document.addEventListener('touchstart', function (e) {
+            var badge = e.target.closest('.player-badge');
+            if (!badge) return;
+            e.preventDefault();
+
+            active   = true;
+            srcBadge = badge;
+
+            var touch = e.touches[0];
+            var rect  = badge.getBoundingClientRect();
+            offsetX   = touch.clientX - rect.left;
+            offsetY   = touch.clientY - rect.top;
+
+            // Create floating visual clone
+            clone = badge.cloneNode(true);
+            clone.style.cssText =
+                'position:fixed;left:' + rect.left + 'px;top:' + rect.top + 'px;' +
+                'width:' + rect.width + 'px;opacity:.85;z-index:9999;pointer-events:none;';
+            document.body.appendChild(clone);
+            badge.style.opacity = '0.4';
+        }, { passive: false });
+
+        document.addEventListener('touchmove', function (e) {
+            if (!active || !clone) return;
+            e.preventDefault();
+
+            var touch = e.touches[0];
+            clone.style.left = (touch.clientX - offsetX) + 'px';
+            clone.style.top  = (touch.clientY - offsetY) + 'px';
+
+            // Detect slot under finger (hide clone momentarily so it doesn't block)
+            clone.style.display = 'none';
+            var el   = document.elementFromPoint(touch.clientX, touch.clientY);
+            clone.style.display = '';
+            var slot = el ? el.closest('.position-slot') : null;
+
+            // Update hover highlight
+            if (lastSlot && lastSlot !== slot) {
+                lastSlot.classList.remove('ui-droppable-hover');
+            }
+            if (slot && slot.dataset.side === srcBadge.dataset.side) {
+                slot.classList.add('ui-droppable-hover');
+                lastSlot = slot;
+            } else {
+                lastSlot = null;
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', function (e) {
+            // Double-tap on an occupied slot removes the player (no active drag needed)
+            if (!active) {
+                var slot = e.target.closest('.position-slot.occupied');
+                if (slot) {
+                    var now = Date.now();
+                    if (lastTapEl === slot && now - lastTapMs < 350) {
+                        var tapSide  = slot.dataset.side;
+                        var tapNum   = parseInt(slot.querySelector('.slot-number').textContent);
+                        var tapBadge = document.querySelector(
+                            '.player-badge[data-side="' + tapSide + '"][data-player-number="' + tapNum + '"]');
+                        if (tapBadge) {
+                            removeFromSlot(parseInt(tapBadge.dataset.playerId), tapSide, $(slot), $(tapBadge));
+                        }
+                        lastTapEl = null; lastTapMs = 0;
+                    } else {
+                        lastTapEl = slot; lastTapMs = now;
+                    }
+                }
+                return;
+            }
+
+            // Cleanup
+            if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+            clone = null;
+            if (srcBadge) srcBadge.style.opacity = '';
+            if (lastSlot) lastSlot.classList.remove('ui-droppable-hover');
+
+            // Drop on valid slot
+            if (lastSlot && srcBadge && lastSlot.dataset.side === srcBadge.dataset.side) {
+                savePosition(
+                    parseInt(srcBadge.dataset.playerId),
+                    parseInt(srcBadge.dataset.playerNumber),
+                    srcBadge.dataset.playerName,
+                    srcBadge.dataset.side,
+                    parseInt(lastSlot.dataset.position),
+                    $(lastSlot),
+                    $(srcBadge)
+                );
+            }
+
+            active = false; srcBadge = null; lastSlot = null;
+        });
+    }
+
     // ── Save a player position via AJAX ───────────────────────────────────────
     function savePosition(playerId, playerNum, playerName, side, position, slot, badge) {
         $.ajax({
@@ -672,6 +778,7 @@
     // ── Initialise ────────────────────────────────────────────────────────────
     $(document).ready(function () {
         initDragDrop();
+        initTouchDragDrop();
         initSignalR();
         initTallyPanel();
 

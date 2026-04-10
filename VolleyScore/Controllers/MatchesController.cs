@@ -134,6 +134,18 @@ public class MatchesController : Controller
 
         if (match == null) return NotFound();
 
+        // Auto-populate set-1 lineup from most recent prior match (only for fresh Setup)
+        if (match.Status == MatchStatus.Setup && !match.PlayerPositions.Any(pp => pp.SetNumber == 1))
+        {
+            await SeedLineupFromPriorMatchAsync(match);
+            // Reload positions in-place so BuildCourtViewModel sees them
+            await _context.Entry(match)
+                .Collection(m => m.PlayerPositions)
+                .Query()
+                .Include(pp => pp.Player)
+                .LoadAsync();
+        }
+
         var currentSet = match.Sets.FirstOrDefault(s => s.SetNumber == match.CurrentSetNumber)
                         ?? match.Sets.OrderBy(s => s.SetNumber).Last();
 
@@ -302,6 +314,74 @@ public class MatchesController : Controller
             HomeIsServing = currentSet.HomeIsServing,
             HomeTeamOnLeft = match.HomeTeamOnLeft
         };
+    }
+}
+
+    // ── Lineup seeding helpers ────────────────────────────────────────────────
+
+    /// <summary>
+    /// For a brand-new Setup match, copies set-1 positions from the most recent
+    /// prior match in which each team's players appeared. Runs both sides in
+    /// parallel; saves once at the end. No-ops if no prior lineup exists.
+    /// </summary>
+    private async Task SeedLineupFromPriorMatchAsync(Match match)
+    {
+        var homeIds = match.HomeTeam!.Players.Select(p => p.Id).ToList();
+        var awayIds = match.AwayTeam!.Players.Select(p => p.Id).ToList();
+
+        var homeTask = SeedSideLineupAsync(match.Id, homeIds, "Home");
+        var awayTask = SeedSideLineupAsync(match.Id, awayIds, "Away");
+        await Task.WhenAll(homeTask, awayTask);
+
+        if (homeTask.Result || awayTask.Result)
+            await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Finds the most recent match where any player from <paramref name="playerIds"/>
+    /// had a set-1 position, then stages those positions for the new match.
+    /// Returns true if at least one position was staged.
+    /// </summary>
+    private async Task<bool> SeedSideLineupAsync(int matchId, List<int> playerIds, string side)
+    {
+        if (playerIds.Count == 0) return false;
+
+        // Most recent match (by ID) that had set-1 positions for any of these players
+        var lastMatchId = await _context.PlayerPositions
+            .Where(pp => playerIds.Contains(pp.PlayerId)
+                      && pp.SetNumber == 1
+                      && pp.MatchId != matchId)
+            .OrderByDescending(pp => pp.MatchId)
+            .Select(pp => pp.MatchId)
+            .FirstOrDefaultAsync();
+
+        if (lastMatchId == 0) return false;
+
+        // Fetch those positions, keeping only players still on this team
+        var source = await _context.PlayerPositions
+            .Where(pp => pp.MatchId == lastMatchId
+                      && pp.SetNumber == 1
+                      && playerIds.Contains(pp.PlayerId)
+                      && pp.Position >= 1 && pp.Position <= 6)
+            .ToListAsync();
+
+        if (source.Count == 0) return false;
+
+        // Guard against any unlikely duplicate positions in source data
+        var usedPositions = new HashSet<int>();
+        foreach (var pp in source.OrderBy(pp => pp.Position))
+        {
+            if (!usedPositions.Add(pp.Position)) continue;
+            _context.PlayerPositions.Add(new PlayerPosition
+            {
+                MatchId   = matchId,
+                SetNumber = 1,
+                PlayerId  = pp.PlayerId,
+                Position  = pp.Position,
+                Side      = side
+            });
+        }
+        return true;
     }
 }
 
