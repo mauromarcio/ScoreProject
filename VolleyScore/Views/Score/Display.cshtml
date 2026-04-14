@@ -1,20 +1,22 @@
 @* File: VolleyScore/Views/Score/Display.cshtml *@
 @* Purpose: Part 2 – Big-screen score display. Opens on a separate monitor/computer.
             Connects to SignalR and updates in real time when operator changes score.
-            Team sides mirror the court view – when sides switch on the court the display updates too. *@
+            Team sides are INVERTED vs court view – from the audience the teams face the
+            opposite direction to how they appear on the operator's court screen. *@
 @model VolleyScore.ViewModels.ScoreDisplayViewModel
 @{
     ViewData["Title"] = Model.MatchReference + " – Display";
     Layout = "_LayoutDisplay";
 
-    // Determine initial left/right based on HomeTeamOnLeft flag
-    var leftTeamName  = Model.HomeTeamOnLeft ? Model.HomeTeamName  : Model.AwayTeamName;
-    var rightTeamName = Model.HomeTeamOnLeft ? Model.AwayTeamName  : Model.HomeTeamName;
-    var leftScore     = Model.HomeTeamOnLeft ? Model.HomeScore     : Model.AwayScore;
-    var rightScore    = Model.HomeTeamOnLeft ? Model.AwayScore     : Model.HomeScore;
-    var leftSetsWon   = Model.HomeTeamOnLeft ? Model.HomeSetsWon   : Model.AwaySetsWon;
-    var rightSetsWon  = Model.HomeTeamOnLeft ? Model.AwaySetsWon   : Model.HomeSetsWon;
-    var leftIsServing = Model.HomeTeamOnLeft ? Model.HomeIsServing : !Model.HomeIsServing;
+    // Invert left/right vs court: the team on the left of the court appears on the
+    // right of the display (audience perspective is the mirror of the operator's view)
+    var leftTeamName  = !Model.HomeTeamOnLeft ? Model.HomeTeamName  : Model.AwayTeamName;
+    var rightTeamName = !Model.HomeTeamOnLeft ? Model.AwayTeamName  : Model.HomeTeamName;
+    var leftScore     = !Model.HomeTeamOnLeft ? Model.HomeScore     : Model.AwayScore;
+    var rightScore    = !Model.HomeTeamOnLeft ? Model.AwayScore     : Model.HomeScore;
+    var leftSetsWon   = !Model.HomeTeamOnLeft ? Model.HomeSetsWon   : Model.AwaySetsWon;
+    var rightSetsWon  = !Model.HomeTeamOnLeft ? Model.AwaySetsWon   : Model.HomeSetsWon;
+    var leftIsServing = !Model.HomeTeamOnLeft ? Model.HomeIsServing : !Model.HomeIsServing;
     int setsToShow    = (Model.TotalSets / 2) + 1;
 }
 
@@ -34,7 +36,7 @@
         flex-direction: column;
         height: 100vh;
         padding: 20px;
-        gap: 16px;
+        gap: 12px;
     }
 
     /* Match header */
@@ -60,20 +62,22 @@
         align-items: center;
         justify-content: center;
         gap: 0;
+        min-height: 0;
     }
 
-    /* Team block */
+    /* Team block – both sides use same structure */
     .display-team {
         flex: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 16px;
+        gap: 12px;
+        min-width: 0;
     }
 
     .display-team-name {
-        font-size: clamp(2rem, 5vw, 4rem);
+        font-size: clamp(2.5rem, 6vw, 5.5rem);
         font-weight: 900;
         color: #ffffff;
         text-align: center;
@@ -83,36 +87,15 @@
         word-break: break-word;
     }
 
-    /* Set dots */
-    .display-set-dots {
-        display: flex;
-        gap: 12px;
-    }
-
-    .display-set-dot {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        border: 3px solid #444;
-        background: transparent;
-        transition: background 0.3s ease, border-color 0.3s ease;
-    }
-
-    .display-set-dot.won {
-        background: #f5c542;
-        border-color: #f5c542;
-        box-shadow: 0 0 12px rgba(245, 197, 66, 0.6);
-    }
-
     /* Score number */
     .display-score-number {
-        font-size: clamp(8rem, 22vw, 18rem);
+        font-size: var(--score-font-size, 24vw);
         font-weight: 900;
-        color: #f5c542;
+        color: #ffe033;
         font-family: 'Courier New', Courier, monospace;
         line-height: 0.9;
         text-shadow:
-            0 0 40px rgba(245, 197, 66, 0.4),
+            0 0 60px rgba(255, 224, 51, 0.5),
             0 4px 20px rgba(0,0,0,0.8);
         transition: transform 0.15s ease;
         min-width: 1ch;
@@ -131,7 +114,6 @@
         align-items: center;
         justify-content: center;
         padding: 0 24px;
-        gap: 8px;
         flex-shrink: 0;
     }
 
@@ -141,33 +123,6 @@
         color: #444;
         line-height: 1;
         font-family: 'Courier New', Courier, monospace;
-    }
-
-    /* Set counter */
-    .display-sets-row {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        flex-shrink: 0;
-    }
-
-    .display-sets-score {
-        font-size: clamp(1.5rem, 4vw, 3rem);
-        font-weight: 700;
-        color: #ccc;
-    }
-
-    .display-sets-score .sets-left,
-    .display-sets-score .sets-right {
-        color: #f5c542;
-    }
-
-    .display-set-label {
-        font-size: 1.1rem;
-        color: #555;
-        text-transform: uppercase;
-        letter-spacing: 2px;
     }
 
     /* Serving indicator */
@@ -185,6 +140,90 @@
     }
 
     .display-serving.hidden { opacity: 0; }
+
+    /* Bottom row: set dots + sets won score */
+    .display-bottom-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        flex-shrink: 0;
+        padding-bottom: 8px;
+    }
+
+    .display-set-dots {
+        display: flex;
+        gap: 12px;
+    }
+
+    .display-set-dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 3px solid #444;
+        background: transparent;
+        transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .display-set-dot.won {
+        background: #ffe033;
+        border-color: #ffe033;
+        box-shadow: 0 0 12px rgba(255, 224, 51, 0.6);
+    }
+
+    .display-sets-score {
+        font-size: clamp(1.5rem, 4vw, 3rem);
+        font-weight: 700;
+        color: #ccc;
+        white-space: nowrap;
+    }
+
+    .display-sets-score .sets-left,
+    .display-sets-score .sets-right {
+        color: #ffe033;
+    }
+
+    /* Font size controls – appear on hover/touch, fade after 15 s */
+    .size-controls {
+        position: fixed;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 20px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease;
+        z-index: 200;
+    }
+
+    .size-controls.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .size-btn {
+        width: 68px;
+        height: 68px;
+        border-radius: 50%;
+        border: 3px solid #ffe033;
+        background: rgba(0, 0, 0, 0.85);
+        color: #ffe033;
+        font-size: 2.8rem;
+        font-weight: 900;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: manipulation;
+        user-select: none;
+        padding: 0;
+    }
+
+    .size-btn:active {
+        background: rgba(255, 224, 51, 0.15);
+    }
 
     /* Connection status indicator */
     .connection-status {
@@ -226,16 +265,9 @@
         <!-- Left team -->
         <div class="display-team" id="displayLeftTeam">
             <div class="display-team-name" id="displayLeftTeamName">@leftTeamName</div>
-            <div class="display-set-dots" id="displayLeftDots">
-                @for (int i = 0; i < setsToShow; i++)
-                {
-                    <div class="display-set-dot @(i < leftSetsWon ? "won" : "")"
-                         data-index="@i"></div>
-                }
-            </div>
-            <div class="display-score-number" id="displayLeftScore">@leftScore</div>
             <div class="display-serving @(leftIsServing ? "" : "hidden")"
                  id="displayLeftServing">SERVING</div>
+            <div class="display-score-number" id="displayLeftScore">@leftScore</div>
         </div>
 
         <!-- Divider -->
@@ -245,29 +277,42 @@
 
         <!-- Right team -->
         <div class="display-team" id="displayRightTeam">
-            <div class="display-serving @(!leftIsServing ? "" : "hidden")" id="displayRightServing">SERVING</div>
-            <div class="display-score-number" id="displayRightScore">@rightScore</div>
-            <div class="display-set-dots" id="displayRightDots">
-                @for (int i = 0; i < setsToShow; i++)
-                {
-                    <div class="display-set-dot @(i < rightSetsWon ? "won" : "")"
-                         data-index="@i"></div>
-                }
-            </div>
             <div class="display-team-name" id="displayRightTeamName">@rightTeamName</div>
+            <div class="display-serving @(!leftIsServing ? "" : "hidden")"
+                 id="displayRightServing">SERVING</div>
+            <div class="display-score-number" id="displayRightScore">@rightScore</div>
         </div>
     </div>
 
-    <!-- Sets won row -->
-    <div class="display-sets-row">
-        <div class="display-set-label">SETS</div>
+    <!-- Bottom: set dots and sets won -->
+    <div class="display-bottom-row">
+        <div class="display-set-dots" id="displayLeftDots">
+            @for (int i = 0; i < setsToShow; i++)
+            {
+                <div class="display-set-dot @(i < leftSetsWon ? "won" : "")"
+                     data-index="@i"></div>
+            }
+        </div>
         <div class="display-sets-score">
             <span class="sets-left" id="displayLeftSets">@leftSetsWon</span>
             <span style="color:#444"> – </span>
             <span class="sets-right" id="displayRightSets">@rightSetsWon</span>
         </div>
+        <div class="display-set-dots" id="displayRightDots">
+            @for (int i = 0; i < setsToShow; i++)
+            {
+                <div class="display-set-dot @(i < rightSetsWon ? "won" : "")"
+                     data-index="@i"></div>
+            }
+        </div>
     </div>
 
+</div>
+
+<!-- Font size controls (appear on hover/touch, auto-hide after 15 s) -->
+<div class="size-controls" id="sizeControls">
+    <button class="size-btn" id="sizeMinus">−</button>
+    <button class="size-btn" id="sizePlus">+</button>
 </div>
 
 <!-- Real-time connection status dot -->
@@ -279,6 +324,7 @@
 @section Scripts {
 <script>
     // Pass server-rendered initial state to the display JS
+    // homeTeamOnLeft is NEGATED here so the JS tracks display-side (inverted from court)
     var DISPLAY_DATA = {
         matchId: @Model.MatchId,
         homeTeamName: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.HomeTeamName)),
@@ -290,7 +336,7 @@
         currentSetNumber: @Model.CurrentSetNumber,
         totalSets: @Model.TotalSets,
         homeIsServing: @Model.HomeIsServing.ToString().ToLower(),
-        homeTeamOnLeft: @Model.HomeTeamOnLeft.ToString().ToLower()
+        homeTeamOnLeft: @(!Model.HomeTeamOnLeft).ToString().ToLower()
     };
 </script>
 <script src="~/js/display.js" asp-append-version="true"></script>

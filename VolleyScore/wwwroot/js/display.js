@@ -2,14 +2,16 @@
 // Purpose: Part 2 – Big-screen display logic.
 //   Connects to SignalR hub, listens for ScoreUpdated events from the operator,
 //   and animates the score numbers in real time without any page reload.
-//   Team sides mirror the court view: when the operator switches sides the display updates too.
+//   Team sides are INVERTED vs court: DISPLAY_DATA.homeTeamOnLeft already carries
+//   the negated value so the mapping below is identical to the original logic.
 
 (function () {
     'use strict';
 
     var matchId        = DISPLAY_DATA.matchId;
     var totalSets      = DISPLAY_DATA.totalSets;
-    var homeTeamOnLeft = DISPLAY_DATA.homeTeamOnLeft; // tracked state
+    // homeTeamOnLeft here means "home is on the LEFT of this display" (already inverted from court)
+    var homeTeamOnLeft = DISPLAY_DATA.homeTeamOnLeft;
 
     // ── DOM element cache ─────────────────────────────────────────────────────
     var $leftScore    = $('#displayLeftScore');
@@ -28,10 +30,10 @@
 
     // ── Apply update from SignalR ──────────────────────────────────────────────
     function applyUpdate(result) {
-        // Determine if the side assignment has changed
-        var htol = (result.homeTeamOnLeft !== undefined) ? result.homeTeamOnLeft : homeTeamOnLeft;
+        // Invert the court-side flag to get the display-side flag
+        var htol = (result.homeTeamOnLeft !== undefined) ? !result.homeTeamOnLeft : homeTeamOnLeft;
 
-        // If side assignment changed, swap team names
+        // If display-side assignment changed, swap team name labels
         if (htol !== homeTeamOnLeft) {
             homeTeamOnLeft = htol;
             var leftName  = htol ? DISPLAY_DATA.homeTeamName : DISPLAY_DATA.awayTeamName;
@@ -40,11 +42,11 @@
             $rightName.text(rightName);
         }
 
-        // Map home/away data to left/right based on current side assignment
-        var leftScore  = htol ? result.homeScore  : result.awayScore;
-        var rightScore = htol ? result.awayScore  : result.homeScore;
-        var leftSets   = htol ? result.homeSetsWon  : result.awaySetsWon;
-        var rightSets  = htol ? result.awaySetsWon  : result.homeSetsWon;
+        // Map home/away data to left/right based on display-side assignment
+        var leftScore     = htol ? result.homeScore    : result.awayScore;
+        var rightScore    = htol ? result.awayScore    : result.homeScore;
+        var leftSets      = htol ? result.homeSetsWon  : result.awaySetsWon;
+        var rightSets     = htol ? result.awaySetsWon  : result.homeSetsWon;
         var leftIsServing = htol ? result.homeIsServing : !result.homeIsServing;
 
         // Animate score change
@@ -71,7 +73,7 @@
             $rightServing.removeClass('hidden');
         }
 
-        // Match complete – show winner
+        // Match complete – show winner overlay
         if (result.matchCompleted && result.winnerName) {
             showMatchComplete(result.winnerName);
         }
@@ -92,13 +94,12 @@
     function updateDots($container, setsWon) {
         $container.find('.display-set-dot').each(function (i) {
             if (i < setsWon) $(this).addClass('won');
-            else $(this).removeClass('won');
+            else             $(this).removeClass('won');
         });
     }
 
     // ── Match complete overlay ────────────────────────────────────────────────
     function showMatchComplete(winnerName) {
-        // Create and inject a simple overlay
         if ($('#matchWinOverlay').length) return;
         var overlay = $('<div>')
             .attr('id', 'matchWinOverlay')
@@ -113,9 +114,9 @@
                 zIndex: 9999
             })
             .html(
-                '<div style="text-align:center;animation:none">' +
+                '<div style="text-align:center">' +
                 '<div style="font-size:5rem;">&#127942;</div>' +
-                '<div style="font-size:clamp(2.5rem,6vw,5rem);font-weight:900;color:#f5c542;margin-top:16px">' +
+                '<div style="font-size:clamp(2.5rem,6vw,5rem);font-weight:900;color:#ffe033;margin-top:16px">' +
                 htmlEscape(winnerName) + '</div>' +
                 '<div style="font-size:2rem;color:#aaa;margin-top:8px">WINS THE MATCH</div>' +
                 '</div>'
@@ -129,6 +130,64 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    // ── Font size controls ────────────────────────────────────────────────────
+    var SCORE_SIZE_KEY     = 'vsDisplayFontSz';
+    var SCORE_SIZE_MIN     = 10;   // vw
+    var SCORE_SIZE_MAX     = 36;   // vw
+    var SCORE_SIZE_DEFAULT = 24;   // vw
+    var SCORE_SIZE_STEP    = 2;    // vw
+    var hideTimer          = null;
+
+    function getScoreSize() {
+        var v = parseInt(localStorage.getItem(SCORE_SIZE_KEY));
+        return (isNaN(v) || v < SCORE_SIZE_MIN || v > SCORE_SIZE_MAX) ? SCORE_SIZE_DEFAULT : v;
+    }
+
+    function applyScoreSize(vw) {
+        document.documentElement.style.setProperty('--score-font-size', vw + 'vw');
+    }
+
+    function showSizeControls() {
+        $('#sizeControls').addClass('visible');
+        resetHideTimer();
+    }
+
+    function resetHideTimer() {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(function () {
+            $('#sizeControls').removeClass('visible');
+        }, 15000);
+    }
+
+    function initSizeControls() {
+        // Apply stored (or default) size immediately
+        applyScoreSize(getScoreSize());
+
+        // Show controls on any mouse movement
+        $(document).on('mousemove', showSizeControls);
+
+        // Show controls on any touch
+        document.addEventListener('touchstart', showSizeControls, { passive: true });
+
+        // − button
+        $('#sizeMinus').on('click', function (e) {
+            e.stopPropagation();
+            var next = Math.max(SCORE_SIZE_MIN, getScoreSize() - SCORE_SIZE_STEP);
+            localStorage.setItem(SCORE_SIZE_KEY, next);
+            applyScoreSize(next);
+            resetHideTimer();
+        });
+
+        // + button
+        $('#sizePlus').on('click', function (e) {
+            e.stopPropagation();
+            var next = Math.min(SCORE_SIZE_MAX, getScoreSize() + SCORE_SIZE_STEP);
+            localStorage.setItem(SCORE_SIZE_KEY, next);
+            applyScoreSize(next);
+            resetHideTimer();
+        });
     }
 
     // ── SignalR connection ─────────────────────────────────────────────────────
@@ -194,6 +253,7 @@
     // ── Init ──────────────────────────────────────────────────────────────────
     $(document).ready(function () {
         initSignalR();
+        initSizeControls();
 
         // Keep screen awake (prevent display sleep) using Wake Lock API
         if ('wakeLock' in navigator) {
