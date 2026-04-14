@@ -367,6 +367,8 @@
             matchStatus = 'Completed';
             $('#btnStartMatch').hide();
             $('#matchStatusText').text('Completed').removeClass('bg-secondary bg-success').addClass('bg-dark');
+            // Append the just-finished set to the history panels (page won't reload for match end)
+            appendSetHistory(result.currentSetNumber, result.homeScore, result.awayScore);
             $('#matchCompleteOverlay').show();
             $('#winnerText').text(result.winnerName ? result.winnerName + ' Wins!' : 'Match Complete');
             $('#winnerSubText').text('Match complete – ' +
@@ -454,6 +456,45 @@
             var isOnCourt = positions.some(function (p) { return p.player && p.player.id === pid; });
             $(this).toggleClass('on-court', isOnCourt);
         });
+    }
+
+    // ── Append a completed set's score to both roster history panels ─────────
+    // Called when the match ends (no page reload happens, so the server-rendered
+    // history panels — which only show SetNumber < currentSetNumber — need updating).
+    function appendSetHistory(setNum, homeScore, awayScore) {
+        var leftScore  = homeTeamOnLeft ? homeScore : awayScore;
+        var rightScore = homeTeamOnLeft ? awayScore : homeScore;
+
+        function makeRow(score) {
+            return '<div class="set-history-item">' +
+                   '<span class="set-history-label">Set ' + setNum + '</span>' +
+                   '<span class="set-history-score">' + score + '</span>' +
+                   '</div>';
+        }
+
+        // Ensure the history container exists in each roster panel; create if absent
+        var $lh = $('#leftSetHistory');
+        if (!$lh.length) {
+            $lh = $('<div class="set-history" id="leftSetHistory"></div>');
+            $('#leftRoster').append($lh);
+        }
+        // Avoid duplicates if SignalR fires twice
+        if (!$lh.find('.set-history-label').filter(function () {
+                return $(this).text() === 'Set ' + setNum;
+            }).length) {
+            $lh.append(makeRow(leftScore));
+        }
+
+        var $rh = $('#rightSetHistory');
+        if (!$rh.length) {
+            $rh = $('<div class="set-history" id="rightSetHistory"></div>');
+            $('#rightRoster').append($rh);
+        }
+        if (!$rh.find('.set-history-label').filter(function () {
+                return $(this).text() === 'Set ' + setNum;
+            }).length) {
+            $rh.append(makeRow(rightScore));
+        }
     }
 
     // ── Set complete overlay ──────────────────────────────────────────────────
