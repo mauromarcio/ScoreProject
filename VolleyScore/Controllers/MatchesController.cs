@@ -272,47 +272,67 @@ public class MatchesController : Controller
         if (req == null)
             return BadRequest(new { success = false, error = "Invalid request" });
 
-        var match = await _context.Matches
-            .Include(m => m.PlayerPositions).ThenInclude(pp => pp.Player)
-            .FirstOrDefaultAsync(m => m.Id == req.MatchId);
-
+        var match = await _context.Matches.FirstOrDefaultAsync(m => m.Id == req.MatchId);
         if (match == null)
             return NotFound(new { success = false, error = "Match not found" });
 
-        var positions = match.PlayerPositions
-            .Where(pp => pp.SetNumber == match.CurrentSetNumber
+        var positions = await _context.PlayerPositions
+            .Where(pp => pp.MatchId == req.MatchId
+                      && pp.SetNumber == match.CurrentSetNumber
                       && pp.Side == req.Side
                       && pp.Position >= 1 && pp.Position <= 6)
-            .ToList();
+            .ToListAsync();
 
         if (!positions.Any())
             return Ok(new { success = true, positions = Array.Empty<object>() });
 
-        // Rotate: forward = each player moves one step toward pos 1 (standard volleyball serve rotation)
-        //         back    = each player moves one step away from pos 1 (undo rotation)
-        foreach (var pp in positions)
+        // Snapshot player → new position before touching the DB
+        // Rotate: forward = toward pos 1 (standard volleyball serve rotation: 2→1, 3→2 … 1→6)
+        //         back    = reverse (1→2, 2→3 … 6→1)
+        var rotated = positions.Select(pp => new
         {
-            pp.Position = req.Direction == "forward"
+            pp.PlayerId,
+            NewPosition = req.Direction == "forward"
                 ? (pp.Position == 1 ? 6 : pp.Position - 1)
-                : (pp.Position == 6 ? 1 : pp.Position + 1);
-        }
+                : (pp.Position == 6 ? 1 : pp.Position + 1)
+        }).ToList();
 
+        // Delete first, then re-insert — two SaveChanges calls avoid the circular-dependency
+        // error that occurs when EF tries to batch-update a unique index in a ring (1→6→5→…→1).
+        _context.PlayerPositions.RemoveRange(positions);
         await _context.SaveChangesAsync();
 
-        var updated = match.PlayerPositions
-            .Where(pp => pp.SetNumber == match.CurrentSetNumber && pp.Side == req.Side)
+        foreach (var r in rotated)
+        {
+            _context.PlayerPositions.Add(new PlayerPosition
+            {
+                MatchId   = req.MatchId,
+                SetNumber = match.CurrentSetNumber,
+                PlayerId  = r.PlayerId,
+                Position  = r.NewPosition,
+                Side      = req.Side
+            });
+        }
+        await _context.SaveChangesAsync();
+
+        // Reload with player info for the JSON response
+        var updated = await _context.PlayerPositions
+            .Include(pp => pp.Player)
+            .Where(pp => pp.MatchId == req.MatchId
+                      && pp.SetNumber == match.CurrentSetNumber
+                      && pp.Side == req.Side)
             .OrderBy(pp => pp.Position)
             .Select(pp => new
             {
                 position = pp.Position,
                 player = pp.Player == null ? null : new
                 {
-                    id = pp.Player.Id,
+                    id     = pp.Player.Id,
                     number = pp.Player.Number,
-                    name = pp.Player.Name
+                    name   = pp.Player.Name
                 }
             })
-            .ToList<object>();
+            .ToListAsync();
 
         return Ok(new { success = true, positions = updated });
     }
