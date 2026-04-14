@@ -172,7 +172,7 @@
             </div>
             @{
                 var leftCompletedSets = Model.Match.Sets
-                    .Where(s => s.IsCompleted && s.SetNumber < Model.CurrentSet.SetNumber)
+                    .Where(s => s.SetNumber < Model.CurrentSet.SetNumber)
                     .OrderBy(s => s.SetNumber).ToList();
             }
             @if (leftCompletedSets.Any())
@@ -282,7 +282,7 @@
             </div>
             @{
                 var rightCompletedSets = Model.Match.Sets
-                    .Where(s => s.IsCompleted && s.SetNumber < Model.CurrentSet.SetNumber)
+                    .Where(s => s.SetNumber < Model.CurrentSet.SetNumber)
                     .OrderBy(s => s.SetNumber).ToList();
             }
             @if (rightCompletedSets.Any())
