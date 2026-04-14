@@ -138,6 +138,7 @@
     var SCORE_SIZE_MAX     = 36;   // vw
     var SCORE_SIZE_DEFAULT = 24;   // vw
     var SCORE_SIZE_STEP    = 2;    // vw
+    var HIDE_DELAY         = 10000; // ms
     var hideTimer          = null;
 
     function getScoreSize() {
@@ -158,17 +159,15 @@
         if (hideTimer) clearTimeout(hideTimer);
         hideTimer = setTimeout(function () {
             $('#sizeControls').removeClass('visible');
-        }, 15000);
+        }, HIDE_DELAY);
     }
 
     function initSizeControls() {
         // Apply stored (or default) size immediately
         applyScoreSize(getScoreSize());
 
-        // Show controls on any mouse movement
-        $(document).on('mousemove', showSizeControls);
-
-        // Show controls on any touch
+        // Show controls on click or touch anywhere on the screen
+        $(document).on('click', showSizeControls);
         document.addEventListener('touchstart', showSizeControls, { passive: true });
 
         // − button

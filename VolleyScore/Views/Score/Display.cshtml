@@ -183,13 +183,14 @@
         color: #ffe033;
     }
 
-    /* Font size controls – appear on hover/touch, fade after 15 s */
+    /* Font size controls – appear on click/touch, fade after 10 s */
     .size-controls {
         position: fixed;
-        bottom: 28px;
-        left: 50%;
-        transform: translateX(-50%);
+        right: 24px;
+        top: 50%;
+        transform: translateY(-50%);
         display: flex;
+        flex-direction: column;
         gap: 20px;
         opacity: 0;
         pointer-events: none;
