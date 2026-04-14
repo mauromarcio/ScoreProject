@@ -265,6 +265,58 @@ public class MatchesController : Controller
         return Ok(new { success = true });
     }
 
+    // POST: Matches/RotatePositions - Rotate all court positions for one team one step forward or back
+    [HttpPost]
+    public async Task<IActionResult> RotatePositions([FromBody] RotatePositionsRequest req)
+    {
+        if (req == null)
+            return BadRequest(new { success = false, error = "Invalid request" });
+
+        var match = await _context.Matches
+            .Include(m => m.PlayerPositions).ThenInclude(pp => pp.Player)
+            .FirstOrDefaultAsync(m => m.Id == req.MatchId);
+
+        if (match == null)
+            return NotFound(new { success = false, error = "Match not found" });
+
+        var positions = match.PlayerPositions
+            .Where(pp => pp.SetNumber == match.CurrentSetNumber
+                      && pp.Side == req.Side
+                      && pp.Position >= 1 && pp.Position <= 6)
+            .ToList();
+
+        if (!positions.Any())
+            return Ok(new { success = true, positions = Array.Empty<object>() });
+
+        // Rotate: forward = each player moves one step toward pos 1 (standard volleyball serve rotation)
+        //         back    = each player moves one step away from pos 1 (undo rotation)
+        foreach (var pp in positions)
+        {
+            pp.Position = req.Direction == "forward"
+                ? (pp.Position == 1 ? 6 : pp.Position - 1)
+                : (pp.Position == 6 ? 1 : pp.Position + 1);
+        }
+
+        await _context.SaveChangesAsync();
+
+        var updated = match.PlayerPositions
+            .Where(pp => pp.SetNumber == match.CurrentSetNumber && pp.Side == req.Side)
+            .OrderBy(pp => pp.Position)
+            .Select(pp => new
+            {
+                position = pp.Position,
+                player = pp.Player == null ? null : new
+                {
+                    id = pp.Player.Id,
+                    number = pp.Player.Number,
+                    name = pp.Player.Name
+                }
+            })
+            .ToList<object>();
+
+        return Ok(new { success = true, positions = updated });
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static MatchCourtViewModel BuildCourtViewModel(Match match, GameSet currentSet)
@@ -392,4 +444,13 @@ public class SavePositionRequest
     public int PlayerId { get; set; }
     public int Position { get; set; }
     public string Side { get; set; } = string.Empty;
+}
+
+/// <summary>Body of the RotatePositions AJAX request</summary>
+public class RotatePositionsRequest
+{
+    public int MatchId { get; set; }
+    public string Side { get; set; } = string.Empty;
+    /// <summary>"forward" = toward pos 1 (volleyball serve rotation); "back" = reverse</summary>
+    public string Direction { get; set; } = "forward";
 }

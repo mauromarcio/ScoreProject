@@ -170,9 +170,28 @@
                     </div>
                 }
             </div>
+            @{
+                var leftCompletedSets = Model.Match.Sets
+                    .Where(s => s.IsCompleted && s.SetNumber < Model.CurrentSet.SetNumber)
+                    .OrderBy(s => s.SetNumber).ToList();
+            }
+            @if (leftCompletedSets.Any())
+            {
+                <div class="set-history" id="leftSetHistory">
+                    @foreach (var s in leftCompletedSets)
+                    {
+                        var sc = leftSide == "Home" ? s.HomeScore : s.AwayScore;
+                        <div class="set-history-item">
+                            <span class="set-history-label">Set @s.SetNumber</span>
+                            <span class="set-history-score">@sc</span>
+                        </div>
+                    }
+                </div>
+            }
         </div>
 
-        <!-- Court canvas -->
+        <!-- Court canvas + rotate buttons -->
+        <div class="court-canvas-wrapper">
         <div class="court-canvas" id="courtCanvas">
 
             <!-- Left court half -->
@@ -221,6 +240,27 @@
             </div>
         </div>
 
+        <!-- Rotation buttons below each court half -->
+        <div class="court-rotate-bar">
+            <div class="rotate-btns-left">
+                <button class="rotate-btn" onclick="rotatePositions('@leftSide', 'back')">
+                    <i class="bi bi-arrow-counterclockwise"></i> Rotate Back
+                </button>
+                <button class="rotate-btn" onclick="rotatePositions('@leftSide', 'forward')">
+                    Rotate Forward <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="rotate-btns-right">
+                <button class="rotate-btn" onclick="rotatePositions('@rightSide', 'back')">
+                    <i class="bi bi-arrow-counterclockwise"></i> Rotate Back
+                </button>
+                <button class="rotate-btn" onclick="rotatePositions('@rightSide', 'forward')">
+                    Rotate Forward <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+        </div>
+        </div>@* end court-canvas-wrapper *@
+
         <!-- Right roster panel -->
         <div class="player-roster away-roster" id="rightRoster">
             <div class="roster-header">@rightTeam.Name</div>
@@ -240,6 +280,24 @@
                     </div>
                 }
             </div>
+            @{
+                var rightCompletedSets = Model.Match.Sets
+                    .Where(s => s.IsCompleted && s.SetNumber < Model.CurrentSet.SetNumber)
+                    .OrderBy(s => s.SetNumber).ToList();
+            }
+            @if (rightCompletedSets.Any())
+            {
+                <div class="set-history" id="rightSetHistory">
+                    @foreach (var s in rightCompletedSets)
+                    {
+                        var sc = rightSide == "Home" ? s.HomeScore : s.AwayScore;
+                        <div class="set-history-item">
+                            <span class="set-history-label">Set @s.SetNumber</span>
+                            <span class="set-history-score">@sc</span>
+                        </div>
+                    }
+                </div>
+            }
         </div>
     </div>
 

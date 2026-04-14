@@ -753,6 +753,33 @@
         return s && s.length > n ? s.slice(0, n) + '\u2026' : s;
     }
 
+    // ── Rotate court positions ────────────────────────────────────────────────
+    // side: 'Home' or 'Away' (the logical team, not display side)
+    // direction: 'forward' (toward pos 1, standard volleyball serve rotation) or 'back'
+    window.rotatePositions = function (side, direction) {
+        $.ajax({
+            url: '/Matches/RotatePositions',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ matchId: matchId, side: side, direction: direction }),
+            success: function (result) {
+                if (!result.success) {
+                    showError(result.error || 'Could not rotate positions.');
+                    return;
+                }
+                // Map logical team side → display side ('left' / 'right')
+                var isLeft = (side === 'Home') === homeTeamOnLeft;
+                var displaySide = isLeft ? 'left' : 'right';
+                var leftIsServing = homeTeamOnLeft ? homeIsServing : !homeIsServing;
+                var sideIsServing = isLeft ? leftIsServing : !leftIsServing;
+                renderCourtPositions(displaySide, result.positions, sideIsServing);
+            },
+            error: function () {
+                showError('Network error rotating positions. Please try again.');
+            }
+        });
+    };
+
     // ── SignalR (listen for updates triggered by other operator windows) ──────
     function initSignalR() {
         var connection = new signalR.HubConnectionBuilder()
