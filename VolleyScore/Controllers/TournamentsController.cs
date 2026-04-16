@@ -714,6 +714,78 @@ public class TournamentsController : Controller
         return result;
     }
 
+    // POST: Tournaments/AssignTeamToPosition
+    // Places a specific team (e.g. from the buffer) into a match slot.
+    // Returns the displaced team's info so the caller can update the buffer chip.
+    [HttpPost]
+    public async Task<IActionResult> AssignTeamToPosition(int tmId, string pos, int newTeamId)
+    {
+        var tm = await _context.TournamentMatches
+            .Include(m => m.Match)
+            .FirstOrDefaultAsync(m => m.Id == tmId);
+
+        if (tm?.Match == null)
+            return NotFound(new { success = false, error = "Match not found" });
+
+        int displacedId;
+        switch (pos)
+        {
+            case "home":
+                displacedId = tm.Match.HomeTeamId;
+                tm.Match.HomeTeamId = newTeamId;
+                break;
+            case "away":
+                displacedId = tm.Match.AwayTeamId;
+                tm.Match.AwayTeamId = newTeamId;
+                break;
+            case "ref":
+                displacedId = tm.RefereeTeamId ?? 0;
+                tm.RefereeTeamId = newTeamId;
+                break;
+            default:
+                return BadRequest(new { success = false, error = "Invalid position" });
+        }
+
+        // Regenerate MatchReference when playing teams change
+        if (pos != "ref")
+        {
+            var tournament = await _context.Tournaments.FindAsync(tm.TournamentId);
+            var playingIds = new[] { tm.Match.HomeTeamId, tm.Match.AwayTeamId }.ToList();
+            var names = await _context.Teams
+                .Where(t => playingIds.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, t => t.Name);
+            bool multi = tournament?.NumberOfCourts > 1;
+            int court = tm.CourtNumber == 0 ? 1 : tm.CourtNumber;
+            tm.Match.MatchReference = multi
+                ? $"{tournament!.Name} – C{court}·{tm.MatchNumber}: {names.GetValueOrDefault(tm.Match.HomeTeamId, "?")} vs {names.GetValueOrDefault(tm.Match.AwayTeamId, "?")}"
+                : $"{tournament!.Name} – Pool {tm.MatchNumber}: {names.GetValueOrDefault(tm.Match.HomeTeamId, "?")} vs {names.GetValueOrDefault(tm.Match.AwayTeamId, "?")}";
+        }
+
+        await _context.SaveChangesAsync();
+
+        var relevantIds = new[] { newTeamId, displacedId }.Where(id => id > 0).Distinct().ToList();
+        var teamNames = relevantIds.Any()
+            ? await _context.Teams.Where(t => relevantIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Name)
+            : new Dictionary<int, string>();
+        var seedNums = relevantIds.Any()
+            ? await _context.TournamentTeams
+                .Where(tt => tt.TournamentId == tm.TournamentId && relevantIds.Contains(tt.TeamId))
+                .ToDictionaryAsync(tt => tt.TeamId, tt => tt.SeedOrder)
+            : new Dictionary<int, int>();
+
+        return Ok(new
+        {
+            success = true,
+            tmId, pos,
+            newTeamId,
+            newTeamName = teamNames.GetValueOrDefault(newTeamId, "—"),
+            newTeamNum  = seedNums.GetValueOrDefault(newTeamId, 0),
+            displacedId,
+            displacedName = teamNames.GetValueOrDefault(displacedId, "—"),
+            displacedNum  = seedNums.GetValueOrDefault(displacedId, 0)
+        });
+    }
+
     // POST: Tournaments/SwapTeamPositions
     // Swaps any two team-position slots (home / away / ref) across any two matches.
     // Works for same-match swaps (e.g. swap home↔away) and cross-match, cross-court swaps.

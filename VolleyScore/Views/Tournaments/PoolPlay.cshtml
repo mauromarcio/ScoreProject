@@ -68,6 +68,11 @@
 
     /* ── Badge compact ───────────────────────────────────────────────────── */
     .badge-status { font-size: .7em !important; }
+
+    /* ── Buffer area chips ───────────────────────────────────────────────── */
+    .buffer-chip { background: #fff8e1; border-color: #ffe082; }
+    .buffer-chip:hover { background: #ffecb3; border-color: #ffc107; }
+    #buffer-chips-body { min-height: 48px; }
 </style>
 
 <div class="container py-4">
@@ -182,6 +187,26 @@
                 </div>
                 <div class="card-body p-0" id="schedule-stats-body">
                     <div class="text-muted text-center small py-3">Loading…</div>
+                </div>
+            </div>
+
+            <!-- ── Buffer Teams Area ──────────────────────────────────── -->
+            <div class="card mt-3" id="buffer-area-card">
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <strong class="small"><i class="bi bi-collection me-1"></i>Buffer Area</strong>
+                    <span class="text-muted" style="font-size:.72em">Drag a chip to any match slot to place</span>
+                </div>
+                <div class="card-body p-2" id="buffer-chips-body">
+                    <div class="d-flex flex-wrap gap-2" id="buffer-chips">
+                        @foreach (var tt in Model.Tournament.TournamentTeams.OrderBy(t => t.SeedOrder))
+                        {
+                            <span class="team-chip buffer-chip" draggable="true"
+                                  data-pos="buffer" data-team-id="@tt.TeamId">
+                                <span class="team-num">T@(tt.SeedOrder)</span>
+                                <span class="team-name">@(tt.Team?.Name ?? "?")</span>
+                            </span>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -343,6 +368,8 @@
         if (dragType === 'chip') {
             var chip = e.target.closest('.team-chip');
             if (chip && chip !== dragSrcEl) {
+                // Ignore buffer → buffer drags (no-op)
+                if (dragSrcEl.dataset.pos === 'buffer' && chip.dataset.pos === 'buffer') return;
                 e.preventDefault();
                 clearChipTargets();
                 chip.classList.add('drop-target');
@@ -378,10 +405,31 @@
             clearChipTargets();
             if (!targetChip || targetChip === dragSrcEl) return;
 
-            swapTeamPositions(
-                parseInt(dragSrcEl.dataset.tmId, 10), dragSrcEl.dataset.pos,
-                parseInt(targetChip.dataset.tmId, 10), targetChip.dataset.pos
-            );
+            var srcIsBuffer = dragSrcEl.dataset.pos === 'buffer';
+            var tgtIsBuffer = targetChip.dataset.pos === 'buffer';
+
+            if (!srcIsBuffer && !tgtIsBuffer) {
+                // Match chip ↔ match chip: standard swap
+                swapTeamPositions(
+                    parseInt(dragSrcEl.dataset.tmId, 10), dragSrcEl.dataset.pos,
+                    parseInt(targetChip.dataset.tmId, 10), targetChip.dataset.pos
+                );
+            } else if (srcIsBuffer && !tgtIsBuffer) {
+                // Buffer → match: put buffer team into match slot
+                assignTeamToPosition(
+                    parseInt(targetChip.dataset.tmId, 10), targetChip.dataset.pos,
+                    parseInt(dragSrcEl.dataset.teamId, 10),
+                    dragSrcEl, targetChip
+                );
+            } else if (!srcIsBuffer && tgtIsBuffer) {
+                // Match → buffer: put buffer chip's team into match slot
+                assignTeamToPosition(
+                    parseInt(dragSrcEl.dataset.tmId, 10), dragSrcEl.dataset.pos,
+                    parseInt(targetChip.dataset.teamId, 10),
+                    targetChip, dragSrcEl
+                );
+            }
+            // buffer → buffer: no-op
 
         } else if (dragType === 'row') {
             var targetCard = e.target.closest('.match-card');
@@ -432,6 +480,35 @@
             renderStats();
         })
         .catch(function () { showToast('Swap failed — please try again.', 'danger'); });
+    }
+
+    // bufferChip  — the buffer-area chip that gets the displaced team
+    // matchChip   — the match-slot chip that gets the new team
+    function assignTeamToPosition(tmId, pos, newTeamId, bufferChip, matchChip) {
+        fetch('/Tournaments/AssignTeamToPosition', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'tmId=' + tmId + '&pos=' + encodeURIComponent(pos) + '&newTeamId=' + newTeamId
+        })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (d) {
+            if (!d.success) { showToast('Assignment failed.', 'danger'); return; }
+            // Update match chip to show the team that was just placed
+            matchChip.dataset.teamId = d.newTeamId;
+            var mNum  = matchChip.querySelector('.team-num');
+            var mName = matchChip.querySelector('.team-name');
+            if (mNum)  mNum.textContent  = 'T' + d.newTeamNum;
+            if (mName) mName.textContent = d.newTeamName || '—';
+            // Update buffer chip to show the displaced team
+            bufferChip.dataset.teamId = d.displacedId;
+            var bNum  = bufferChip.querySelector('.team-num');
+            var bName = bufferChip.querySelector('.team-name');
+            if (bNum)  bNum.textContent  = 'T' + d.displacedNum;
+            if (bName) bName.textContent = d.displacedName || '—';
+            showToast('T' + d.newTeamNum + ' ' + d.newTeamName + ' placed; T' + d.displacedNum + ' ' + d.displacedName + ' returned to buffer.', 'success');
+            renderStats();
+        })
+        .catch(function () { showToast('Assignment failed — please try again.', 'danger'); });
     }
 
     function updateChip(tmId, pos, teamId, teamName, teamNum) {
