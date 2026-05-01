@@ -1048,6 +1048,9 @@ public class TournamentsController : Controller
     /// <summary>
     /// Computes pool standings sorted by: (1) sets won desc, (2) points ratio desc,
     /// (3) points made desc.
+    ///
+    /// Includes InProgress matches so standings update in real-time during play.
+    /// Only Setup (not-yet-started) matches are excluded.
     /// </summary>
     public List<TeamStanding> ComputeStandings(Tournament tournament)
     {
@@ -1071,7 +1074,8 @@ public class TournamentsController : Controller
         foreach (var tm in poolMatches)
         {
             var m = tm.Match!;
-            if (m.Status != MatchStatus.Completed) continue;
+            // Skip matches not yet started; include both InProgress and Completed
+            if (m.Status == MatchStatus.Setup) continue;
 
             int homeId = m.HomeTeamId;
             int awayId = m.AwayTeamId;
@@ -1084,7 +1088,8 @@ public class TournamentsController : Controller
             homeEntry.MatchesPlayed++;
             awayEntry.MatchesPlayed++;
 
-            foreach (var set in m.Sets.Where(s => s.IsCompleted))
+            // Include all sets (completed and the current in-progress set's live score)
+            foreach (var set in m.Sets)
             {
                 homeEntry.PointsMade    += set.HomeScore;
                 homeEntry.PointsAgainst += set.AwayScore;
