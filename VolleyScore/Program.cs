@@ -127,8 +127,45 @@ static async Task ApplySchemaUpdates(VolleyScoreContext db)
             HomeFromWinner     BIT NOT NULL DEFAULT 1,
             AwaySourceMatchId  INT NULL,
             AwayFromWinner     BIT NOT NULL DEFAULT 1,
-            SortOrder          INT NOT NULL DEFAULT 0
+            SortOrder          INT NOT NULL DEFAULT 0,
+            MatchNumber        INT NOT NULL DEFAULT 0,
+            CourtNumber        INT NOT NULL DEFAULT 1,
+            RefereeTeamId      INT NULL     REFERENCES Teams(Id) ON DELETE NO ACTION,
+            HomeTeamLongWait   BIT NOT NULL DEFAULT 0,
+            AwayTeamLongWait   BIT NOT NULL DEFAULT 0
         );");
+
+    // ── Column additions for existing TournamentMatches tables ──────────────
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'TournamentMatches') AND name = N'MatchNumber')
+            ALTER TABLE TournamentMatches ADD MatchNumber INT NOT NULL DEFAULT 0;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'TournamentMatches') AND name = N'CourtNumber')
+            ALTER TABLE TournamentMatches ADD CourtNumber INT NOT NULL DEFAULT 1;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'TournamentMatches') AND name = N'RefereeTeamId')
+            ALTER TABLE TournamentMatches ADD RefereeTeamId INT NULL REFERENCES Teams(Id) ON DELETE NO ACTION;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'TournamentMatches') AND name = N'HomeTeamLongWait')
+            ALTER TABLE TournamentMatches ADD HomeTeamLongWait BIT NOT NULL DEFAULT 0;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'TournamentMatches') AND name = N'AwayTeamLongWait')
+            ALTER TABLE TournamentMatches ADD AwayTeamLongWait BIT NOT NULL DEFAULT 0;");
+
+    // ── Column additions for existing Tournaments tables ─────────────────────
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'NumberOfCourts')
+            ALTER TABLE Tournaments ADD NumberOfCourts INT NOT NULL DEFAULT 1;");
 }
 
 // ── Middleware Pipeline ───────────────────────────────────────────────────────

@@ -29,6 +29,11 @@ public class Tournament
     [Display(Name = "Initial Score (handicap)")]
     public int InitialScore { get; set; } = 0;
 
+    /// <summary>Number of courts available for simultaneous play in pool stage.</summary>
+    [Range(1, 20)]
+    [Display(Name = "Number of Courts")]
+    public int NumberOfCourts { get; set; } = 1;
+
     public TournamentStatus Status { get; set; } = TournamentStatus.Setup;
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;

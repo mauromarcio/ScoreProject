@@ -46,6 +46,21 @@ public class TournamentMatch
 
     public int SortOrder { get; set; }
 
+    /// <summary>Sequential match number within the pool (used on print schedule and court display).</summary>
+    public int MatchNumber { get; set; }
+
+    /// <summary>Court assignment for parallel-play schedules (1-based; 0 = unassigned).</summary>
+    public int CourtNumber { get; set; } = 1;
+
+    /// <summary>Optional referee team for pool-stage matches.</summary>
+    public int? RefereeTeamId { get; set; }
+
+    /// <summary>True when the home team had 3+ consecutive idle slots before this match.</summary>
+    public bool HomeTeamLongWait { get; set; }
+
+    /// <summary>True when the away team had 3+ consecutive idle slots before this match.</summary>
+    public bool AwayTeamLongWait { get; set; }
+
     // Navigation
     [ForeignKey("TournamentId")]
     public Tournament? Tournament { get; set; }
@@ -61,4 +76,7 @@ public class TournamentMatch
 
     [ForeignKey("AwayTeamId")]
     public Team? AwayTeam { get; set; }
+
+    [ForeignKey("RefereeTeamId")]
+    public Team? RefereeTeam { get; set; }
 }

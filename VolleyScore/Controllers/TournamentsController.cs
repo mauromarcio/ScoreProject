@@ -519,10 +519,10 @@ public class TournamentsController : Controller
             dict[homeId].SetsLost  += awaySets;
             dict[awayId].SetsWon   += awaySets;
             dict[awayId].SetsLost  += homeSets;
-            dict[homeId].PointsScored  += homePoints;
-            dict[homeId].PointsAllowed += awayPoints;
-            dict[awayId].PointsScored  += awayPoints;
-            dict[awayId].PointsAllowed += homePoints;
+            dict[homeId].PointsMade  += homePoints;
+            dict[homeId].PointsAgainst += awayPoints;
+            dict[awayId].PointsMade  += awayPoints;
+            dict[awayId].PointsAgainst += homePoints;
 
             // Match W/L only recorded when the match is fully complete
             if (match.Status == MatchStatus.Completed)
@@ -535,7 +535,7 @@ public class TournamentsController : Controller
         return dict.Values
             .OrderByDescending(s => s.SetsWon)
             .ThenByDescending(s => s.PointsRatio)
-            .ThenByDescending(s => s.PointsScored)
+            .ThenByDescending(s => s.PointsMade)
             .ToList();
     }
 
@@ -558,15 +558,15 @@ public class TournamentsController : Controller
                 combined[s.TeamId].MatchesLost    += s.MatchesLost;
                 combined[s.TeamId].SetsWon        += s.SetsWon;
                 combined[s.TeamId].SetsLost       += s.SetsLost;
-                combined[s.TeamId].PointsScored   += s.PointsScored;
-                combined[s.TeamId].PointsAllowed  += s.PointsAllowed;
+                combined[s.TeamId].PointsMade   += s.PointsMade;
+                combined[s.TeamId].PointsAgainst  += s.PointsAgainst;
             }
         }
 
         return combined.Values
             .OrderByDescending(s => s.SetsWon)
             .ThenByDescending(s => s.PointsRatio)
-            .ThenByDescending(s => s.PointsScored)
+            .ThenByDescending(s => s.PointsMade)
             .ToList();
     }
 

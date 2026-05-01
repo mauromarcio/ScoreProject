@@ -14,6 +14,10 @@ public class TournamentTeam
     /// <summary>Overall enrollment order / seed (user-adjustable)</summary>
     public int SeedPosition { get; set; }
 
+    /// <summary>Alias for SeedPosition — used by pool-play and report views.</summary>
+    [NotMapped]
+    public int SeedOrder => SeedPosition;
+
     [ForeignKey("TournamentId")]
     public Tournament? Tournament { get; set; }
 
