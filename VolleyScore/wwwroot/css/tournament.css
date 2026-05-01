@@ -115,6 +115,12 @@
     font-weight: 700;
 }
 
+/* ── Live indicator ──────────────────────────────────────────────────────────── */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+}
+
 /* ── Print styles ────────────────────────────────────────────────────────────── */
 @media print {
     .pool-card { break-inside: avoid; }

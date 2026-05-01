@@ -491,10 +491,12 @@ public class TournamentsController : Controller
             .DistinctBy(t => t.Id)
             .ToDictionary(t => t.Id, t => new TeamStanding { TeamId = t.Id, TeamName = t.Name });
 
+        // Include both completed and in-progress matches so standings stay live.
+        // Points and completed-set counts always update; match W/L only finalises on completion.
         var poolMatches = allMatches
             .Where(tm => tm.PoolId == pool.Id
                       && tm.Match != null
-                      && tm.Match.Status == MatchStatus.Completed)
+                      && tm.Match.Status != MatchStatus.Setup)
             .ToList();
 
         foreach (var tm in poolMatches)
@@ -504,24 +506,30 @@ public class TournamentsController : Controller
             int awayId = match.AwayTeamId;
             if (!dict.ContainsKey(homeId) || !dict.ContainsKey(awayId)) continue;
 
+            // Count only sets that have a declared winner (completed sets within the match)
             int homeSets = match.Sets.Count(s => s.WinnerTeamId == homeId);
             int awaySets = match.Sets.Count(s => s.WinnerTeamId == awayId);
+            // Points from all sets, including the current in-progress set
             int homePoints = match.Sets.Sum(s => s.HomeScore);
             int awayPoints = match.Sets.Sum(s => s.AwayScore);
 
             dict[homeId].MatchesPlayed++;
             dict[awayId].MatchesPlayed++;
-            dict[homeId].SetsWon    += homeSets;
-            dict[homeId].SetsLost   += awaySets;
-            dict[awayId].SetsWon    += awaySets;
-            dict[awayId].SetsLost   += homeSets;
-            dict[homeId].PointsScored   += homePoints;
-            dict[homeId].PointsAllowed  += awayPoints;
-            dict[awayId].PointsScored   += awayPoints;
-            dict[awayId].PointsAllowed  += homePoints;
+            dict[homeId].SetsWon   += homeSets;
+            dict[homeId].SetsLost  += awaySets;
+            dict[awayId].SetsWon   += awaySets;
+            dict[awayId].SetsLost  += homeSets;
+            dict[homeId].PointsScored  += homePoints;
+            dict[homeId].PointsAllowed += awayPoints;
+            dict[awayId].PointsScored  += awayPoints;
+            dict[awayId].PointsAllowed += homePoints;
 
-            if (homeSets > awaySets) { dict[homeId].MatchesWon++; dict[awayId].MatchesLost++; }
-            else                     { dict[awayId].MatchesWon++; dict[homeId].MatchesLost++; }
+            // Match W/L only recorded when the match is fully complete
+            if (match.Status == MatchStatus.Completed)
+            {
+                if (homeSets > awaySets) { dict[homeId].MatchesWon++; dict[awayId].MatchesLost++; }
+                else                     { dict[awayId].MatchesWon++; dict[homeId].MatchesLost++; }
+            }
         }
 
         return dict.Values
