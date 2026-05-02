@@ -27,6 +27,7 @@
         <div class="row g-3">
             @foreach (var team in Model)
             {
+                var rotationCount = team.Rotations?.Count ?? 0;
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100">
                         <div class="card-body">
@@ -39,12 +40,23 @@
                                 <small class="text-muted">
                                     <i class="bi bi-person me-1"></i>@team.Players.Count player(s)
                                 </small>
+                                @if (rotationCount > 0)
+                                {
+                                    <small class="text-success ms-2">
+                                        <i class="bi bi-arrow-repeat me-1"></i>@rotationCount/6 rotation saved
+                                    </small>
+                                }
                             </p>
                         </div>
-                        <div class="card-footer bg-transparent d-flex gap-2">
+                        <div class="card-footer bg-transparent d-flex gap-2 flex-wrap">
                             <a asp-controller="Players" asp-action="Index" asp-route-teamId="@team.Id"
                                class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-person-badge me-1"></i>Players
+                            </a>
+                            <a asp-action="Rotation" asp-route-id="@team.Id"
+                               class="btn btn-sm @(rotationCount == 6 ? "btn-success" : "btn-outline-info")"
+                               title="Set initial court rotation">
+                                <i class="bi bi-arrow-repeat me-1"></i>Rotation
                             </a>
                             <a asp-action="Edit" asp-route-id="@team.Id"
                                class="btn btn-sm btn-outline-secondary">
