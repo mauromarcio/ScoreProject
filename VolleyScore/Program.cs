@@ -131,6 +131,20 @@ using (var scope = app.Services.CreateScope())
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'NumberOfCourts')
                 ALTER TABLE Tournaments ADD NumberOfCourts INT NOT NULL DEFAULT 1;
         ");
+
+        // ── TeamRotations table for initial lineup feature ────────────────────
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'TeamRotations')
+            BEGIN
+                CREATE TABLE TeamRotations (
+                    Id       INT IDENTITY(1,1) PRIMARY KEY,
+                    TeamId   INT NOT NULL REFERENCES Teams(Id) ON DELETE CASCADE,
+                    PlayerId INT NOT NULL REFERENCES Players(Id),
+                    Position INT NOT NULL,
+                    CONSTRAINT UQ_TeamRotation UNIQUE (TeamId, Position)
+                )
+            END
+        ");
     }
     catch (Exception ex)
     {
