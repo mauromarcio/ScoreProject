@@ -326,6 +326,23 @@
     background: #dee2e6;
 }
 
+/* Initial rotation button — teal accent to distinguish from rotate back/forward */
+.rotate-btn-initial {
+    border-color: #0d9488;
+    color: #0d9488;
+    background: #f0fdfa;
+}
+
+.rotate-btn-initial:hover {
+    background: #ccfbf1;
+    border-color: #0f766e;
+    color: #0f766e;
+}
+
+.rotate-btn-initial:active {
+    background: #99f6e4;
+}
+
 /* ── Set score history (bottom of roster panels) ─────────────────────────── */
 .set-history {
     flex-shrink: 0;
