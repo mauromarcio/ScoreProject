@@ -155,8 +155,7 @@ public class MatchesController : Controller
 
     // POST: Matches/SavePosition - Called via AJAX when a player is drag-dropped onto a position
     [HttpPost]
-    public async Task<IActionResult> SavePosition(
-        [FromBody] SavePositionRequest req)
+    public async Task<IActionResult> SavePosition([FromBody] SavePositionRequest req)
     {
         if (req == null)
             return BadRequest(new { success = false, error = "Invalid request" });
@@ -337,6 +336,85 @@ public class MatchesController : Controller
         return Ok(new { success = true, positions = updated });
     }
 
+    // POST: Matches/ApplyInitialRotation
+    // Replaces the current set's court positions for one side with the team's saved initial rotation.
+    [HttpPost]
+    public async Task<IActionResult> ApplyInitialRotation([FromBody] ApplyInitialRotationRequest req)
+    {
+        if (req == null)
+            return BadRequest(new { success = false, error = "Invalid request" });
+
+        var match = await _context.Matches
+            .FirstOrDefaultAsync(m => m.Id == req.MatchId);
+        if (match == null)
+            return NotFound(new { success = false, error = "Match not found" });
+
+        var teamId = req.Side == "Home" ? match.HomeTeamId : match.AwayTeamId;
+
+        // Only apply positions for players currently on this team (guards against roster changes)
+        var validPlayerIds = await _context.Players
+            .Where(p => p.TeamId == teamId)
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        var savedRotation = await _context.TeamRotations
+            .Where(r => r.TeamId == teamId
+                     && r.Position >= 1 && r.Position <= 6
+                     && validPlayerIds.Contains(r.PlayerId))
+            .ToListAsync();
+
+        if (!savedRotation.Any())
+            return Ok(new { success = false, error = "No initial rotation saved for this team." });
+
+        // Remove current positions for this side/set
+        var current = await _context.PlayerPositions
+            .Where(pp => pp.MatchId == req.MatchId
+                      && pp.SetNumber == match.CurrentSetNumber
+                      && pp.Side == req.Side)
+            .ToListAsync();
+        _context.PlayerPositions.RemoveRange(current);
+        await _context.SaveChangesAsync();
+
+        // Insert saved rotation
+        foreach (var r in savedRotation)
+        {
+            _context.PlayerPositions.Add(new PlayerPosition
+            {
+                MatchId   = req.MatchId,
+                SetNumber = match.CurrentSetNumber,
+                PlayerId  = r.PlayerId,
+                Position  = r.Position,
+                Side      = req.Side
+            });
+        }
+        await _context.SaveChangesAsync();
+
+        // Return updated positions (all 6 slots, nulls for any unset)
+        var filled = await _context.PlayerPositions
+            .Include(pp => pp.Player)
+            .Where(pp => pp.MatchId == req.MatchId
+                      && pp.SetNumber == match.CurrentSetNumber
+                      && pp.Side == req.Side)
+            .ToDictionaryAsync(pp => pp.Position);
+
+        var positions = Enumerable.Range(1, 6).Select(pos =>
+        {
+            var pp = filled.GetValueOrDefault(pos);
+            return new
+            {
+                position = pos,
+                player = pp?.Player == null ? null : new
+                {
+                    id     = pp.Player.Id,
+                    number = pp.Player.Number,
+                    name   = pp.Player.Name
+                }
+            };
+        }).ToList();
+
+        return Ok(new { success = true, positions });
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static MatchCourtViewModel BuildCourtViewModel(Match match, GameSet currentSet)
@@ -387,9 +465,6 @@ public class MatchesController : Controller
             HomeTeamOnLeft = match.HomeTeamOnLeft
         };
     }
-}
-
-    // ── Lineup seeding helpers ────────────────────────────────────────────────
 
     /// <summary>
     /// For a brand-new Setup match, copies set-1 positions from the most recent
@@ -456,7 +531,6 @@ public class MatchesController : Controller
     }
 }
 
-/// <summary>Body of the SavePosition AJAX request</summary>
 public class SavePositionRequest
 {
     public int MatchId { get; set; }
@@ -466,11 +540,17 @@ public class SavePositionRequest
     public string Side { get; set; } = string.Empty;
 }
 
-/// <summary>Body of the RotatePositions AJAX request</summary>
 public class RotatePositionsRequest
 {
     public int MatchId { get; set; }
     public string Side { get; set; } = string.Empty;
     /// <summary>"forward" = toward pos 1 (volleyball serve rotation); "back" = reverse</summary>
     public string Direction { get; set; } = "forward";
+}
+
+public class ApplyInitialRotationRequest
+{
+    public int MatchId { get; set; }
+    /// <summary>"Home" or "Away"</summary>
+    public string Side { get; set; } = string.Empty;
 }
