@@ -246,6 +246,10 @@
                 <button class="rotate-btn" onclick="rotatePositions('@leftSide', 'back')">
                     <i class="bi bi-arrow-counterclockwise"></i> Rotate Back
                 </button>
+                <button class="rotate-btn rotate-btn-initial" onclick="applyInitialRotation('@leftSide')"
+                        title="Apply saved initial rotation for @leftTeam.Name">
+                    <i class="bi bi-arrow-repeat"></i> Initial
+                </button>
                 <button class="rotate-btn" onclick="rotatePositions('@leftSide', 'forward')">
                     Rotate Forward <i class="bi bi-arrow-clockwise"></i>
                 </button>
@@ -253,6 +257,10 @@
             <div class="rotate-btns-right">
                 <button class="rotate-btn" onclick="rotatePositions('@rightSide', 'back')">
                     <i class="bi bi-arrow-counterclockwise"></i> Rotate Back
+                </button>
+                <button class="rotate-btn rotate-btn-initial" onclick="applyInitialRotation('@rightSide')"
+                        title="Apply saved initial rotation for @rightTeam.Name">
+                    <i class="bi bi-arrow-repeat"></i> Initial
                 </button>
                 <button class="rotate-btn" onclick="rotatePositions('@rightSide', 'forward')">
                     Rotate Forward <i class="bi bi-arrow-clockwise"></i>
