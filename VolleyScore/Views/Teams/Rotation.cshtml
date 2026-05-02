@@ -1,0 +1,493 @@
+@* File: VolleyScore/Views/Teams/Rotation.cshtml *@
+@* Purpose: Drag-and-drop editor for a team's initial 6-player court rotation *@
+@model VolleyScore.Models.Team
+@using System.Text.Json
+@{
+    ViewData["Title"] = Model.Name + " – Initial Rotation";
+    var savedRotation = Model.Rotations.ToDictionary(r => r.Position, r => r.Player);
+
+    // Position metadata: position number → label
+    var posLabels = new Dictionary<int, string>
+    {
+        { 1, "Server" }, { 2, "Front R" }, { 3, "Front C" },
+        { 4, "Front L" }, { 5, "Back L" }, { 6, "Back C" }
+    };
+    // Grid order: front row (near net) then back row
+    int[] gridOrder = { 4, 3, 2, 5, 6, 1 };
+}
+
+<div class="container py-4" style="max-width:860px">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h2 class="mb-0">
+                <i class="bi bi-arrow-repeat me-2 text-info"></i>@Model.Name – Initial Rotation
+            </h2>
+            <small class="text-muted">
+                Drag players onto court positions then save. This rotation can be applied at any time during a match.
+            </small>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!Model.Players.Any())
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            No players on this team yet.
+            <a asp-controller="Players" asp-action="Index" asp-route-teamId="@Model.Id">Add players first.</a>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+
+            <!-- ── Player roster ─────────────────────────────────────── -->
+            <div class="col-md-4 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-header fw-semibold small">
+                        <i class="bi bi-people me-1"></i>Players
+                        <span class="text-muted ms-1">– drag to a slot</span>
+                    </div>
+                    <div class="card-body p-2" id="playerRoster">
+                        @foreach (var p in Model.Players.OrderBy(p => p.Number))
+                        {
+                            var inRotation = Model.Rotations.Any(r => r.PlayerId == p.Id);
+                            <div class="rot-badge @(inRotation ? "rot-badge-placed" : "")"
+                                 draggable="true"
+                                 data-player-id="@p.Id"
+                                 data-player-number="@p.Number"
+                                 data-player-name="@p.Name"
+                                 id="rpbadge-@p.Id">
+                                <div class="rot-badge-num">#@p.Number</div>
+                                <div class="rot-badge-name">@p.Name</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Court diagram ─────────────────────────────────────── -->
+            <div class="col-md-8 col-lg-9">
+                <div class="card">
+                    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+                        <i class="bi bi-grid-3x2-gap me-1"></i>Court Positions
+                        <span class="badge ms-auto" id="slotsFilled">0/6 filled</span>
+                    </div>
+                    <div class="card-body pb-2">
+
+                        <!-- Net bar -->
+                        <div class="rot-net">← NET →</div>
+
+                        <!-- 3×2 grid: top row = front (4,3,2), bottom row = back (5,6,1) -->
+                        <div class="rot-grid" id="rotationGrid">
+                            @foreach (var pos in gridOrder)
+                            {
+                                var player = savedRotation.ContainsKey(pos) ? savedRotation[pos] : null;
+                                <div class="rot-slot @(player != null ? "rot-slot-filled" : "") @(pos == 1 ? "rot-slot-server" : "")"
+                                     data-position="@pos"
+                                     id="rslot-@pos">
+                                    @if (player != null)
+                                    {
+                                        <div class="rot-slot-pnum">#@player.Number</div>
+                                        <div class="rot-slot-pname">@player.Name</div>
+                                        <button class="rot-slot-clear" type="button" data-position="@pos" tabindex="-1">×</button>
+                                    }
+                                    else
+                                    {
+                                        <div class="rot-slot-posnum">@pos</div>
+                                        <div class="rot-slot-poslabel">@posLabels[pos]</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Row labels -->
+                        <div class="rot-row-labels">
+                            <span>← Front Row (near net)</span>
+                            <span>Back Row →</span>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="d-flex gap-2 mt-3 flex-wrap">
+                            <button class="btn btn-success" id="btnSave" type="button">
+                                <i class="bi bi-floppy me-1"></i>Save Rotation
+                            </button>
+                            <button class="btn btn-outline-secondary" id="btnClear" type="button">
+                                <i class="bi bi-x-circle me-1"></i>Clear All
+                            </button>
+                        </div>
+                        <div id="saveStatus" class="mt-2 small"></div>
+
+                    </div>
+                </div>
+
+                <!-- Position legend -->
+                <div class="card mt-3">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex flex-wrap gap-3 small text-muted">
+                            <span><strong>1</strong> – Back Right (Server)</span>
+                            <span><strong>2</strong> – Front Right</span>
+                            <span><strong>3</strong> – Front Center</span>
+                            <span><strong>4</strong> – Front Left</span>
+                            <span><strong>5</strong> – Back Left</span>
+                            <span><strong>6</strong> – Back Center</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    }
+</div>
+
+@section Styles {
+<style>
+    /* ── Player badges ──────────────────────────────────────────── */
+    .rot-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        margin-bottom: 5px;
+        background: #fff;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        cursor: grab;
+        user-select: none;
+        transition: border-color .15s, background .15s;
+    }
+    .rot-badge:hover   { border-color: #0d6efd; }
+    .rot-badge.dragging { opacity: .4; cursor: grabbing; }
+    .rot-badge.rot-badge-placed { border-color: #198754; background: #f0fff4; }
+    .rot-badge-num  { font-weight: 700; color: #0d6efd; min-width: 36px; font-size: .95rem; }
+    .rot-badge-name { font-size: .85rem; color: #333; }
+
+    /* ── Net bar ────────────────────────────────────────────────── */
+    .rot-net {
+        background: #333;
+        color: #fff;
+        font-size: .7rem;
+        font-weight: 700;
+        letter-spacing: 3px;
+        text-align: center;
+        padding: 5px 0;
+        border-radius: 4px;
+        margin-bottom: 8px;
+    }
+
+    /* ── Court grid ─────────────────────────────────────────────── */
+    .rot-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    /* ── Position slots ─────────────────────────────────────────── */
+    .rot-slot {
+        position: relative;
+        min-height: 90px;
+        border: 2px dashed #ced4da;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 8px 6px;
+        transition: border-color .15s, background .15s;
+    }
+    .rot-slot:hover         { border-color: #adb5bd; }
+    .rot-slot.drag-over     { border-color: #0d6efd; background: #eef3ff; border-style: solid; }
+    .rot-slot.rot-slot-filled { border-style: solid; border-color: #198754; background: #f0fff4; }
+    .rot-slot.rot-slot-server { border-color: #fd7e14; }
+    .rot-slot.rot-slot-server.rot-slot-filled { border-color: #198754; }
+
+    .rot-slot-posnum   { font-size: 2rem; font-weight: 700; color: #ced4da; line-height: 1; }
+    .rot-slot-poslabel { font-size: .65rem; color: #adb5bd; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+    .rot-slot-server .rot-slot-posnum   { color: #fd7e14; }
+    .rot-slot-server .rot-slot-poslabel { color: #fd7e14; }
+
+    .rot-slot-pnum  { font-size: 1.4rem; font-weight: 700; color: #198754; line-height: 1; }
+    .rot-slot-pname { font-size: .75rem; color: #333; word-break: break-word; margin-top: 2px; }
+
+    .rot-slot-clear {
+        position: absolute; top: 4px; right: 5px;
+        background: none; border: none; color: #adb5bd;
+        font-size: 1.1rem; line-height: 1; padding: 0 2px;
+        cursor: pointer;
+    }
+    .rot-slot-clear:hover { color: #dc3545; }
+
+    /* ── Row labels ─────────────────────────────────────────────── */
+    .rot-row-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: .68rem;
+        color: #adb5bd;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        margin-top: 6px;
+        padding: 0 2px;
+    }
+
+    /* ── Touch drag ghost ───────────────────────────────────────── */
+    .rot-touch-ghost {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        opacity: .85;
+        border-radius: 8px;
+        padding: 7px 10px;
+        background: #fff;
+        border: 2px solid #0d6efd;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+</style>
+}
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    var TEAM_ID = @Model.Id;
+
+    // In-memory: position (1-6) → { playerId, playerNumber, playerName }
+    var state = {};
+
+    // Initialise from server-rendered saved rotation
+    @foreach (var r in Model.Rotations)
+    {
+        if (r.Player != null)
+        {
+            <text>state[@r.Position] = { playerId: @r.Player.Id, playerNumber: @r.Player.Number, playerName: @JsonSerializer.Serialize(r.Player.Name) };</text>
+        }
+    }
+
+    refreshAll();
+
+    // ── HTML5 Drag & Drop ──────────────────────────────────────────────────
+    document.querySelectorAll('.rot-badge').forEach(function (badge) {
+        badge.addEventListener('dragstart', function (e) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('playerId',     badge.dataset.playerId);
+            e.dataTransfer.setData('playerNumber', badge.dataset.playerNumber);
+            e.dataTransfer.setData('playerName',   badge.dataset.playerName);
+            badge.classList.add('dragging');
+        });
+        badge.addEventListener('dragend', function () {
+            badge.classList.remove('dragging');
+        });
+    });
+
+    document.querySelectorAll('.rot-slot').forEach(function (slot) {
+        slot.addEventListener('dragover',  function (e) { e.preventDefault(); slot.classList.add('drag-over'); });
+        slot.addEventListener('dragleave', function ()  { slot.classList.remove('drag-over'); });
+        slot.addEventListener('drop', function (e) {
+            e.preventDefault();
+            slot.classList.remove('drag-over');
+            assign(
+                parseInt(e.dataTransfer.getData('playerId')),
+                parseInt(e.dataTransfer.getData('playerNumber')),
+                e.dataTransfer.getData('playerName'),
+                parseInt(slot.dataset.position)
+            );
+        });
+    });
+
+    // ── Touch drag-and-drop (mobile / tablet) ─────────────────────────────
+    var touchActive = false, touchBadge = null, touchGhost = null, touchLastSlot = null;
+    var touchOffX = 0, touchOffY = 0;
+
+    document.addEventListener('touchstart', function (e) {
+        var badge = e.target.closest('.rot-badge');
+        if (!badge) return;
+        e.preventDefault();
+        touchActive = true;
+        touchBadge  = badge;
+
+        var t    = e.touches[0];
+        var rect = badge.getBoundingClientRect();
+        touchOffX = t.clientX - rect.left;
+        touchOffY = t.clientY - rect.top;
+
+        touchGhost = document.createElement('div');
+        touchGhost.className = 'rot-touch-ghost';
+        touchGhost.innerHTML = '<span style="font-weight:700;color:#0d6efd">#' + badge.dataset.playerNumber + '</span>' +
+                               '<span>' + escHtml(badge.dataset.playerName) + '</span>';
+        touchGhost.style.left = rect.left + 'px';
+        touchGhost.style.top  = rect.top  + 'px';
+        document.body.appendChild(touchGhost);
+        badge.style.opacity = '0.4';
+    }, { passive: false });
+
+    document.addEventListener('touchmove', function (e) {
+        if (!touchActive || !touchGhost) return;
+        e.preventDefault();
+        var t = e.touches[0];
+        touchGhost.style.left = (t.clientX - touchOffX) + 'px';
+        touchGhost.style.top  = (t.clientY - touchOffY) + 'px';
+
+        touchGhost.style.display = 'none';
+        var el   = document.elementFromPoint(t.clientX, t.clientY);
+        touchGhost.style.display = '';
+        var slot = el ? el.closest('.rot-slot') : null;
+
+        if (touchLastSlot && touchLastSlot !== slot)
+            touchLastSlot.classList.remove('drag-over');
+        if (slot) { slot.classList.add('drag-over'); touchLastSlot = slot; }
+        else       touchLastSlot = null;
+    }, { passive: false });
+
+    document.addEventListener('touchend', function () {
+        if (!touchActive) return;
+        if (touchGhost && touchGhost.parentNode) touchGhost.parentNode.removeChild(touchGhost);
+        touchGhost = null;
+        if (touchBadge) touchBadge.style.opacity = '';
+
+        if (touchLastSlot) {
+            touchLastSlot.classList.remove('drag-over');
+            assign(
+                parseInt(touchBadge.dataset.playerId),
+                parseInt(touchBadge.dataset.playerNumber),
+                touchBadge.dataset.playerName,
+                parseInt(touchLastSlot.dataset.position)
+            );
+        }
+
+        touchActive = false; touchBadge = null; touchLastSlot = null;
+    });
+
+    // ── Clear individual slot via × button ────────────────────────────────
+    document.addEventListener('click', function (e) {
+        if (!e.target.matches('.rot-slot-clear')) return;
+        clearSlot(parseInt(e.target.dataset.position));
+    });
+
+    // ── Clear all ─────────────────────────────────────────────────────────
+    document.getElementById('btnClear').addEventListener('click', function () {
+        [1, 2, 3, 4, 5, 6].forEach(clearSlot);
+    });
+
+    // ── Save ──────────────────────────────────────────────────────────────
+    document.getElementById('btnSave').addEventListener('click', function () {
+        var positions = [];
+        for (var p = 1; p <= 6; p++) {
+            if (state[p]) positions.push({ position: p, playerId: state[p].playerId });
+        }
+
+        var btn = document.getElementById('btnSave');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+
+        fetch('/Teams/SaveRotation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ teamId: TEAM_ID, positions: positions })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (result) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Save Rotation';
+            if (result.success) {
+                var el = document.getElementById('saveStatus');
+                el.className = 'mt-2 small text-success';
+                el.innerHTML = '<i class="bi bi-check-circle me-1"></i>Rotation saved (' + result.saved + '/6 positions).';
+                setTimeout(function () { el.innerHTML = ''; }, 3500);
+            } else {
+                showErr(result.error || 'Save failed.');
+            }
+        })
+        .catch(function () {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-floppy me-1"></i>Save Rotation';
+            showErr('Network error. Please try again.');
+        });
+    });
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    function assign(playerId, playerNumber, playerName, position) {
+        // If this player is already placed elsewhere, remove from that slot
+        for (var p = 1; p <= 6; p++) {
+            if (p !== position && state[p] && state[p].playerId === playerId)
+                clearSlot(p);
+        }
+        state[position] = { playerId: playerId, playerNumber: playerNumber, playerName: playerName };
+        renderSlot(position);
+        refreshBadges();
+        refreshCount();
+    }
+
+    function clearSlot(position) {
+        delete state[position];
+        renderSlot(position);
+        refreshBadges();
+        refreshCount();
+    }
+
+    function renderSlot(position) {
+        var slot = document.getElementById('rslot-' + position);
+        if (!slot) return;
+        var labels = { 1: 'Server', 2: 'Front R', 3: 'Front C', 4: 'Front L', 5: 'Back L', 6: 'Back C' };
+        var d = state[position];
+        if (d) {
+            slot.classList.add('rot-slot-filled');
+            slot.innerHTML =
+                '<div class="rot-slot-pnum">#' + d.playerNumber + '</div>' +
+                '<div class="rot-slot-pname">' + escHtml(d.playerName) + '</div>' +
+                '<button class="rot-slot-clear" type="button" data-position="' + position + '" tabindex="-1">×</button>';
+        } else {
+            slot.classList.remove('rot-slot-filled');
+            slot.innerHTML =
+                '<div class="rot-slot-posnum">' + position + '</div>' +
+                '<div class="rot-slot-poslabel">' + (labels[position] || '') + '</div>';
+        }
+    }
+
+    function refreshBadges() {
+        var placed = Object.values(state).map(function (v) { return v.playerId; });
+        document.querySelectorAll('.rot-badge').forEach(function (b) {
+            b.classList.toggle('rot-badge-placed', placed.indexOf(parseInt(b.dataset.playerId)) !== -1);
+        });
+    }
+
+    function refreshCount() {
+        var n   = Object.keys(state).length;
+        var el  = document.getElementById('slotsFilled');
+        el.textContent = n + '/6 filled';
+        el.className   = 'badge ms-auto ' + (n === 6 ? 'bg-success' : n > 0 ? 'bg-warning text-dark' : 'bg-secondary');
+    }
+
+    function refreshAll() {
+        [1, 2, 3, 4, 5, 6].forEach(renderSlot);
+        refreshBadges();
+        refreshCount();
+    }
+
+    function showErr(msg) {
+        var el = document.getElementById('saveStatus');
+        el.className = 'mt-2 small text-danger';
+        el.innerHTML = '<i class="bi bi-x-circle me-1"></i>' + escHtml(msg);
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+})();
+</script>
+}
