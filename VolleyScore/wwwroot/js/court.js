@@ -3,7 +3,7 @@
 //   - jQuery UI drag-and-drop for player positioning
 //   - Score button AJAX calls
 //   - SignalR subscription for round-trip confirmation
-//   - Court position updates after rotation
+//   - Court position updates after rotation / initial-rotation apply
 //   - Side-switching, match start, overlay display
 
 (function () {
@@ -791,7 +791,7 @@
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
     function truncate(s, n) {
-        return s && s.length > n ? s.slice(0, n) + '\u2026' : s;
+        return s && s.length > n ? s.slice(0, n) + '…' : s;
     }
 
     // ── Rotate court positions ────────────────────────────────────────────────
@@ -817,6 +817,32 @@
             },
             error: function () {
                 showError('Network error rotating positions. Please try again.');
+            }
+        });
+    };
+
+    // ── Apply saved initial rotation ──────────────────────────────────────────
+    // Replaces the current set's court positions for one team with their saved
+    // initial rotation (set up in Teams → Rotation).
+    window.applyInitialRotation = function (side) {
+        $.ajax({
+            url: '/Matches/ApplyInitialRotation',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ matchId: matchId, side: side }),
+            success: function (result) {
+                if (!result.success) {
+                    showError(result.error || 'No initial rotation saved for this team.');
+                    return;
+                }
+                var isLeft      = (side === 'Home') === homeTeamOnLeft;
+                var displaySide = isLeft ? 'left' : 'right';
+                var leftIsServing  = homeTeamOnLeft ? homeIsServing : !homeIsServing;
+                var sideIsServing  = isLeft ? leftIsServing : !leftIsServing;
+                renderCourtPositions(displaySide, result.positions, sideIsServing);
+            },
+            error: function () {
+                showError('Network error applying initial rotation. Please try again.');
             }
         });
     };
