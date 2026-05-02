@@ -1,5 +1,5 @@
 // File: VolleyScore/Controllers/TeamsController.cs
-// Purpose: CRUD operations for volleyball teams
+// Purpose: CRUD operations for volleyball teams + initial rotation management
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +22,7 @@ public class TeamsController : Controller
     {
         var teams = await _context.Teams
             .Include(t => t.Players)
+            .Include(t => t.Rotations)
             .OrderBy(t => t.Name)
             .ToListAsync();
         return View(teams);
@@ -102,4 +103,60 @@ public class TeamsController : Controller
         }
         return RedirectToAction(nameof(Index));
     }
+
+    // GET: Teams/Rotation/5 — drag-drop editor for the team's initial 6-player lineup
+    public async Task<IActionResult> Rotation(int id)
+    {
+        var team = await _context.Teams
+            .Include(t => t.Players)
+            .Include(t => t.Rotations).ThenInclude(r => r.Player)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (team == null) return NotFound();
+        return View(team);
+    }
+
+    // POST: Teams/SaveRotation — AJAX endpoint; replaces the team's full saved rotation
+    [HttpPost]
+    public async Task<IActionResult> SaveRotation([FromBody] SaveRotationRequest req)
+    {
+        if (req == null || req.TeamId == 0)
+            return BadRequest(new { success = false, error = "Invalid request" });
+
+        // Verify team exists
+        if (!await _context.Teams.AnyAsync(t => t.Id == req.TeamId))
+            return NotFound(new { success = false, error = "Team not found" });
+
+        // Remove all existing rotation entries for this team, then re-insert
+        var existing = await _context.TeamRotations
+            .Where(r => r.TeamId == req.TeamId)
+            .ToListAsync();
+        _context.TeamRotations.RemoveRange(existing);
+
+        int saved = 0;
+        foreach (var pos in req.Positions.Where(p => p.PlayerId > 0 && p.Position >= 1 && p.Position <= 6))
+        {
+            _context.TeamRotations.Add(new TeamRotation
+            {
+                TeamId   = req.TeamId,
+                PlayerId = pos.PlayerId,
+                Position = pos.Position
+            });
+            saved++;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true, saved });
+    }
+}
+
+public class SaveRotationRequest
+{
+    public int TeamId { get; set; }
+    public List<RotationPositionItem> Positions { get; set; } = new();
+}
+
+public class RotationPositionItem
+{
+    public int Position { get; set; }
+    public int PlayerId { get; set; }
 }
