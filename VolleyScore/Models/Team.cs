@@ -21,4 +21,5 @@ public class Team
 
     // Navigation properties
     public ICollection<Player> Players { get; set; } = new List<Player>();
+    public ICollection<TeamRotation> Rotations { get; set; } = new List<TeamRotation>();
 }
