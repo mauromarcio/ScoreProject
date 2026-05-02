@@ -18,6 +18,7 @@ public class VolleyScoreContext : DbContext
     public DbSet<Match> Matches { get; set; }
     public DbSet<GameSet> GameSets { get; set; }
     public DbSet<PlayerPosition> PlayerPositions { get; set; }
+    public DbSet<TeamRotation> TeamRotations { get; set; }
     public DbSet<Tournament> Tournaments { get; set; }
     public DbSet<TournamentTeam> TournamentTeams { get; set; }
     public DbSet<TournamentMatch> TournamentMatches { get; set; }
@@ -90,6 +91,22 @@ public class VolleyScoreContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict);
             // One player per position per set per side
             entity.HasIndex(e => new { e.MatchId, e.SetNumber, e.Side, e.Position }).IsUnique();
+        });
+
+        // TeamRotation configuration
+        modelBuilder.Entity<TeamRotation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Team)
+                  .WithMany(t => t.Rotations)
+                  .HasForeignKey(e => e.TeamId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Player)
+                  .WithMany()
+                  .HasForeignKey(e => e.PlayerId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            // One position slot per team
+            entity.HasIndex(e => new { e.TeamId, e.Position }).IsUnique();
         });
 
         // Tournament configuration
