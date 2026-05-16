@@ -253,8 +253,18 @@
                 <button class="rotate-btn" onclick="rotatePositions('@leftSide', 'forward')">
                     Rotate Forward <i class="bi bi-arrow-clockwise"></i>
                 </button>
+                <button class="rotate-btn timeout-btn" id="timeoutLeft"
+                        onclick="callTimeOut('@leftSide')"
+                        title="Call time-out for @leftTeam.Name (1 per set)">
+                    <i class="bi bi-stopwatch me-1"></i> Time-Out
+                </button>
             </div>
             <div class="rotate-btns-right">
+                <button class="rotate-btn timeout-btn" id="timeoutRight"
+                        onclick="callTimeOut('@rightSide')"
+                        title="Call time-out for @rightTeam.Name (1 per set)">
+                    <i class="bi bi-stopwatch me-1"></i> Time-Out
+                </button>
                 <button class="rotate-btn" onclick="rotatePositions('@rightSide', 'back')">
                     <i class="bi bi-arrow-counterclockwise"></i> Rotate Back
                 </button>

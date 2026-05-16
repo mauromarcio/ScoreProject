@@ -91,6 +91,26 @@ public class ScoreController : Controller
 
     // ── Score mutation endpoints ──────────────────────────────────────────────
 
+    // POST: Score/CallTimeOut  {matchId, team:"Home"|"Away"}
+    // Records a time-out call; broadcasts TimeOutCalled via SignalR so the display screen shows it.
+    [HttpPost]
+    public async Task<IActionResult> CallTimeOut([FromBody] ScoreRequest req)
+    {
+        var match = await _context.Matches
+            .Include(m => m.Sets)
+            .FirstOrDefaultAsync(m => m.Id == req.MatchId);
+
+        if (match == null) return NotFound(new { success = false });
+
+        var currentSet = match.Sets.FirstOrDefault(s => s.SetNumber == match.CurrentSetNumber);
+        if (currentSet == null) return BadRequest(new { success = false });
+
+        await _hubContext.Clients.Group($"match-{req.MatchId}")
+            .SendAsync("TimeOutCalled", new { team = req.Team, setNumber = match.CurrentSetNumber });
+
+        return Ok(new { success = true, setNumber = match.CurrentSetNumber });
+    }
+
     // POST: Score/AddPoint  {matchId, team:"Home"|"Away"}
     [HttpPost]
     public async Task<IActionResult> AddPoint([FromBody] ScoreRequest req)

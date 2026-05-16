@@ -226,6 +226,27 @@
         background: rgba(255, 224, 51, 0.15);
     }
 
+    /* Time-out banner — shown on display when a team calls time-out */
+    .display-timeout {
+        font-size: 1rem;
+        font-weight: 800;
+        color: #ff5252;
+        letter-spacing: 3px;
+        padding: 5px 18px;
+        border: 2px solid #ff5252;
+        border-radius: 20px;
+        background: rgba(255, 82, 82, 0.12);
+        animation: timeout-pulse 0.9s ease-in-out infinite alternate;
+        text-transform: uppercase;
+    }
+
+    .display-timeout.hidden { display: none; }
+
+    @keyframes timeout-pulse {
+        from { opacity: 0.6; border-color: rgba(255,82,82,0.5); }
+        to   { opacity: 1;   border-color: #ff5252; }
+    }
+
     /* Connection status indicator */
     .connection-status {
         position: fixed;
@@ -268,6 +289,7 @@
             <div class="display-team-name" id="displayLeftTeamName">@leftTeamName</div>
             <div class="display-serving @(leftIsServing ? "" : "hidden")"
                  id="displayLeftServing">SERVING</div>
+            <div class="display-timeout hidden" id="displayLeftTimeOut">TIME-OUT</div>
             <div class="display-score-number" id="displayLeftScore">@leftScore</div>
         </div>
 
@@ -281,6 +303,7 @@
             <div class="display-team-name" id="displayRightTeamName">@rightTeamName</div>
             <div class="display-serving @(!leftIsServing ? "" : "hidden")"
                  id="displayRightServing">SERVING</div>
+            <div class="display-timeout hidden" id="displayRightTimeOut">TIME-OUT</div>
             <div class="display-score-number" id="displayRightScore">@rightScore</div>
         </div>
     </div>

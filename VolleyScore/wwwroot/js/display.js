@@ -98,6 +98,17 @@
         });
     }
 
+    // ── Time-out indicator ────────────────────────────────────────────────────
+    // Shows a pulsing "TIME-OUT" banner on the team's side for 30 seconds.
+    function showTimeOut(team) {
+        var isLeft = (team === 'Home') === homeTeamOnLeft;
+        var el = document.getElementById(isLeft ? 'displayLeftTimeOut' : 'displayRightTimeOut');
+        if (!el) return;
+        el.classList.remove('hidden');
+        clearTimeout(el._hideTimer);
+        el._hideTimer = setTimeout(function () { el.classList.add('hidden'); }, 30000);
+    }
+
     // ── Match complete overlay ────────────────────────────────────────────────
     function showMatchComplete(winnerName) {
         if ($('#matchWinOverlay').length) return;
@@ -199,6 +210,11 @@
         // Receive score updates
         connection.on('ScoreUpdated', function (result) {
             applyUpdate(result);
+        });
+
+        // Time-out called by operator
+        connection.on('TimeOutCalled', function (data) {
+            showTimeOut(data.team);
         });
 
         // Connection lifecycle

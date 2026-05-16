@@ -847,6 +847,49 @@
         });
     };
 
+    // ── Time-out ───────────────────────────────────────────────────────────────
+    // One time-out per team per set. State stored in localStorage so it survives
+    // brief page navigation. Key is scoped to matchId + setNumber + side.
+
+    function getToKey(side) {
+        return 'vsTO_' + matchId + '_' + setNumber + '_' + side;
+    }
+
+    function isTimeOutUsed(side) {
+        return localStorage.getItem(getToKey(side)) === '1';
+    }
+
+    function markTimeoutUsed(side) {
+        localStorage.setItem(getToKey(side), '1');
+        refreshTimeoutBtn(side);
+    }
+
+    function refreshTimeoutBtn(side) {
+        var isLeft = (side === 'Home') === homeTeamOnLeft;
+        var btn = document.getElementById(isLeft ? 'timeoutLeft' : 'timeoutRight');
+        if (!btn) return;
+        var used = isTimeOutUsed(side);
+        btn.disabled = used;
+        btn.classList.toggle('timeout-used', used);
+        btn.innerHTML = used
+            ? '<i class="bi bi-stopwatch"></i> T/O Used'
+            : '<i class="bi bi-stopwatch me-1"></i> Time-Out';
+    }
+
+    window.callTimeOut = function (side) {
+        if (isTimeOutUsed(side) || matchStatus === 'Completed') return;
+        $.ajax({
+            url: '/Score/CallTimeOut',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ matchId: matchId, team: side }),
+            success: function (result) {
+                if (result.success) markTimeoutUsed(side);
+            },
+            error: function () { showError('Could not register time-out.'); }
+        });
+    };
+
     // ── SignalR (listen for updates triggered by other operator windows) ──────
     function initSignalR() {
         var connection = new signalR.HubConnectionBuilder()
@@ -858,6 +901,13 @@
             // Only apply if it comes from a different browser tab
             // (our own AJAX calls already applied the update)
             applyScoreUpdate(result);
+        });
+
+        // Sync timeout button state if another operator tab called a time-out
+        connection.on('TimeOutCalled', function (data) {
+            if (!isTimeOutUsed(data.team)) {
+                markTimeoutUsed(data.team);
+            }
         });
 
         connection.start()
@@ -879,6 +929,10 @@
         // Set initial serving highlight on position 1
         var initServingLeft = homeTeamOnLeft ? homeIsServing : !homeIsServing;
         updateServingBadge(initServingLeft);
+
+        // Restore timeout button state from localStorage (survives same-set page refresh)
+        refreshTimeoutBtn('Home');
+        refreshTimeoutBtn('Away');
     });
 
 })();
