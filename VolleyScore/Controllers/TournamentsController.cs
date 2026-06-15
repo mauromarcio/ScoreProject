@@ -369,7 +369,9 @@ public class TournamentsController : Controller
             CurrentSetNumber = 1,
             HomeTeamOnLeft = true,
             ServingTeamId = homeTeamId.Value,
-            IsDoubles = tournament.TournamentType == TournamentType.Doubles
+            IsDoubles = tournament.TournamentType == TournamentType.Doubles,
+            PointsToWin = tournament.PointsToWin,
+            PointsCap = tournament.PointsCap
         };
         _context.Matches.Add(match);
         await _context.SaveChangesAsync();
@@ -636,6 +638,79 @@ public class TournamentsController : Controller
         var match = source.Match;
         return source.WinnerTeamId == match.HomeTeamId ? match.AwayTeamId : match.HomeTeamId;
     }
+
+    // ── Delete tournament ─────────────────────────────────────────────────────
+
+    [HttpPost]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var tournament = await _context.Tournaments.FindAsync(id);
+        if (tournament != null)
+        {
+            _context.Tournaments.Remove(tournament);
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"Tournament '{tournament.Name}' deleted.";
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // ── Pool match management ─────────────────────────────────────────────────
+
+    [HttpPost]
+    public async Task<IActionResult> AddPoolMatch(int id, int poolId, int homeTeamId, int awayTeamId)
+    {
+        if (homeTeamId == awayTeamId)
+        {
+            TempData["Error"] = "Home and Away teams must be different.";
+            return RedirectToAction(nameof(Manage), new { id });
+        }
+        var tournament = await _context.Tournaments
+            .Include(t => t.TournamentMatches)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (tournament == null) return NotFound();
+        var pool = await _context.Pools.FindAsync(poolId);
+        int existingCount = tournament.TournamentMatches.Count(tm => tm.PoolId == poolId);
+        int nextSort = tournament.TournamentMatches.Any() ? tournament.TournamentMatches.Max(tm => tm.SortOrder) + 1 : 0;
+        _context.TournamentMatches.Add(new TournamentMatch
+        {
+            TournamentId = id,
+            PoolId = poolId,
+            Phase = TournamentPhase.Pool,
+            HomeTeamId = homeTeamId,
+            AwayTeamId = awayTeamId,
+            Label = $"{pool?.Name ?? "Pool"} M{existingCount + 1}",
+            SortOrder = nextSort
+        });
+        if (tournament.Status == TournamentStatus.Setup) tournament.Status = TournamentStatus.PoolStage;
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Manage), new { id });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> DeletePoolMatch(int id, int tournamentMatchId)
+    {
+        var tm = await _context.TournamentMatches
+            .Include(x => x.Match).ThenInclude(m => m!.Sets)
+            .FirstOrDefaultAsync(x => x.Id == tournamentMatchId && x.TournamentId == id);
+        if (tm == null) return NotFound();
+        if (tm.Match != null) _context.Matches.Remove(tm.Match);
+        _context.TournamentMatches.Remove(tm);
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Manage), new { id });
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ReorderPoolMatches([FromBody] ReorderMatchesRequest req)
+    {
+        if (req?.MatchIds == null) return BadRequest(new { success = false });
+        for (int i = 0; i < req.MatchIds.Count; i++)
+        {
+            var tm = await _context.TournamentMatches.FindAsync(req.MatchIds[i]);
+            if (tm != null) tm.SortOrder = i;
+        }
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true });
+    }
 }
 
 // ── Request / DTO models ──────────────────────────────────────────────────────
@@ -649,6 +724,11 @@ public class PoolOrderItem
 {
     public int PoolId { get; set; }
     public List<int> TournamentTeamIds { get; set; } = new();
+}
+
+public class ReorderMatchesRequest
+{
+    public List<int> MatchIds { get; set; } = new();
 }
 
 // TeamStanding is in VolleyScore.ViewModels.TournamentViewModels

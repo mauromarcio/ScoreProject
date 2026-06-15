@@ -50,6 +50,12 @@ public class Match
     /// <summary>True for Doubles (beach 2v2) matches – only 2 players per side required to start.</summary>
     public bool IsDoubles { get; set; } = false;
 
+    [Range(1, 99)]
+    public int PointsToWin { get; set; } = 25;
+
+    [Range(0, 99)]
+    public int PointsCap { get; set; } = 0;
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation properties

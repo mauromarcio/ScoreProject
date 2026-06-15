@@ -33,6 +33,8 @@
                     @Model.SetsPerMatch sets/match
                     @if (Model.InitialScore > 0) { <span>&nbsp;|&nbsp;+@Model.InitialScore handicap</span> }
                     @if (isDoubles) { <span>&nbsp;|&nbsp;@Model.NumberOfPools pools</span> }
+                    &nbsp;|&nbsp;Win: @Model.PointsToWin pts
+                    @if (Model.PointsCap > 0) { <span>&nbsp;|&nbsp;Cap: @Model.PointsCap</span> }
                     &nbsp;|&nbsp; Status: <strong>@Model.Status</strong>
                 </small>
             </div>
@@ -41,6 +43,12 @@
             <a asp-action="Report" asp-route-id="@Model.Id" class="btn btn-outline-info btn-sm">
                 <i class="bi bi-bar-chart me-1"></i>Report
             </a>
+            <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-inline"
+                  onsubmit="return confirm('Delete tournament \'@Model.Name\'? This will remove all related data and cannot be undone.')">
+                <button type="submit" class="btn btn-danger btn-sm">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </form>
         </div>
     </div>
 
@@ -169,95 +177,91 @@
         <!-- RIGHT: Matches list + knockouts -->
         <div class="col-lg-4">
 
-            @if (hasSchedule)
+            @if (hasSchedule || hasPools)
             {
-                <!-- Pool stage matches -->
-                <div class="card mb-3">
-                    <div class="card-header fw-semibold">
-                        <i class="bi bi-calendar-week me-1"></i>Pool Matches
-                        @if (isDoubles && crossPoolMatches.Any())
-                        {
-                            <span class="badge bg-secondary ms-1">Pool only</span>
-                        }
+                @foreach (var pool in Model.Pools.OrderBy(p => p.SortOrder))
+                {
+                    var poolMatches = Model.TournamentMatches
+                        .Where(x => x.Phase == TournamentPhase.Pool && x.PoolId == pool.Id)
+                        .OrderBy(x => x.SortOrder)
+                        .ToList();
+                    var poolTeams = pool.PoolTeams.OrderBy(pt => pt.SortOrder)
+                        .Select(pt => new { id = pt.TournamentTeam!.TeamId, name = pt.TournamentTeam!.Team?.Name ?? "" })
+                        .ToList();
+
+                    <div class="card mb-2">
+                        <div class="card-header fw-semibold py-2 d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-grid me-1"></i>@pool.Name Matches</span>
+                            <span class="badge bg-secondary">@poolMatches.Count match(es)</span>
+                        </div>
+                        <div class="card-body p-0">
+                            @if (poolMatches.Any())
+                            {
+                                <table class="table table-sm table-hover mb-0">
+                                    <tbody class="sortable-match-list" data-pool-id="@pool.Id">
+                                        @foreach (var tm in poolMatches)
+                                        {
+                                            var match = tm.Match;
+                                            bool done = match?.Status == MatchStatus.Completed;
+                                            <tr class="match-row @(done ? "table-success" : "")" data-match-id="@tm.Id">
+                                                <td style="width:20px;cursor:grab" class="text-muted match-drag-handle">
+                                                    <i class="bi bi-grip-vertical"></i>
+                                                </td>
+                                                <td class="small text-muted">@tm.Label</td>
+                                                <td class="small">@tm.HomeTeam?.Name</td>
+                                                <td class="small text-muted">vs</td>
+                                                <td class="small">@tm.AwayTeam?.Name</td>
+                                                <td class="small">
+                                                    @if (done && match != null) { int h = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId); int a = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId); <strong>@h–@a</strong> }
+                                                    else if (match?.Status == MatchStatus.InProgress) { <span class="badge bg-warning text-dark">Live</span> }
+                                                    else { <span class="text-muted">–</span> }
+                                                </td>
+                                                <td class="text-end" style="white-space:nowrap">
+                                                    @if (match == null) { <a asp-action="StartTournamentMatch" asp-route-id="@Model.Id" asp-route-tournamentMatchId="@tm.Id" class="btn btn-xs btn-outline-primary me-1" title="Start"><i class="bi bi-play-fill"></i></a> }
+                                                    else { <a asp-controller="Matches" asp-action="Court" asp-route-id="@match.Id" class="btn btn-xs btn-outline-secondary me-1" title="Court"><i class="bi bi-display"></i></a> }
+                                                    <form asp-action="DeletePoolMatch" method="post" class="d-inline" onsubmit="return confirm('Delete this match?')">
+                                                        <input type="hidden" name="id" value="@Model.Id" />
+                                                        <input type="hidden" name="tournamentMatchId" value="@tm.Id" />
+                                                        <button type="submit" class="btn btn-xs btn-outline-danger" title="Delete match">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            else
+                            {
+                                <p class="text-muted small text-center py-2 mb-0">No matches yet.</p>
+                            }
+                            <!-- Add Match form -->
+                            @if (poolTeams.Count >= 2)
+                            {
+                                <form asp-action="AddPoolMatch" method="post" class="d-flex gap-1 p-2 border-top align-items-center flex-wrap">
+                                    <input type="hidden" name="id" value="@Model.Id" />
+                                    <input type="hidden" name="poolId" value="@pool.Id" />
+                                    <select name="homeTeamId" class="form-select form-select-sm" style="min-width:120px">
+                                        @foreach (var t in poolTeams) { <option value="@t.id">@t.name</option> }
+                                    </select>
+                                    <span class="small text-muted fw-bold">vs</span>
+                                    <select name="awayTeamId" class="form-select form-select-sm" style="min-width:120px">
+                                        @foreach (var t in poolTeams) { <option value="@t.id">@t.name</option> }
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">
+                                        <i class="bi bi-plus me-1"></i>Add Match
+                                    </button>
+                                </form>
+                            }
+                        </div>
                     </div>
-                    <div class="card-body p-0">
-                        <table class="table table-sm table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Match</th>
-                                    <th>Home</th>
-                                    <th>Away</th>
-                                    <th>Result</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var tm in Model.TournamentMatches
-                                    .Where(x => x.Phase == TournamentPhase.Pool && x.PoolId != null)
-                                    .OrderBy(x => x.SortOrder))
-                                {
-                                    var match = tm.Match;
-                                    bool done = match?.Status == MatchStatus.Completed;
-                                    <tr class="@(done ? "table-success" : "")">
-                                        <td class="small text-muted">@tm.Label</td>
-                                        <td class="small">@tm.HomeTeam?.Name</td>
-                                        <td class="small">@tm.AwayTeam?.Name</td>
-                                        <td class="small">
-                                            @if (done && match != null)
-                                            {
-                                                int h = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId);
-                                                int a = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId);
-                                                <strong>@h – @a</strong>
-                                            }
-                                            else if (match != null && match.Status == MatchStatus.InProgress)
-                                            {
-                                                <span class="badge bg-warning text-dark">Live</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted">–</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            @if (match == null)
-                                            {
-                                                <a asp-action="StartTournamentMatch"
-                                                   asp-route-id="@Model.Id"
-                                                   asp-route-tournamentMatchId="@tm.Id"
-                                                   class="btn btn-xs btn-outline-primary"
-                                                   title="Start match">
-                                                    <i class="bi bi-play-fill"></i>
-                                                </a>
-                                            }
-                                            else
-                                            {
-                                                <a asp-controller="Matches" asp-action="Court"
-                                                   asp-route-id="@match.Id"
-                                                   class="btn btn-xs btn-outline-secondary"
-                                                   title="Open court">
-                                                    <i class="bi bi-display"></i>
-                                                </a>
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="card-footer bg-transparent">
-                        <form asp-action="GenerateKnockouts" asp-route-id="@Model.Id" method="post">
-                            <button type="submit" class="btn btn-warning btn-sm w-100"
-                                    onclick="return confirm('Generate knockout bracket from current standings?')">
-                                <i class="bi bi-trophy me-1"></i>Generate Knockouts
-                            </button>
-                        </form>
-                    </div>
-                </div>
+                }
 
                 @if (isDoubles && crossPoolMatches.Any())
                 {
                     <!-- Cross-pool matches (Doubles) -->
-                    <div class="card mb-3">
+                    <div class="card mb-2">
                         <div class="card-header fw-semibold">
                             <i class="bi bi-shuffle me-1"></i>Cross-Pool Matches
                         </div>
@@ -280,9 +284,16 @@
                                                 else if (match?.Status == MatchStatus.InProgress) { <span class="badge bg-warning text-dark">Live</span> }
                                                 else { <span class="text-muted">–</span> }
                                             </td>
-                                            <td>
-                                                @if (match == null) { <a asp-action="StartTournamentMatch" asp-route-id="@Model.Id" asp-route-tournamentMatchId="@tm.Id" class="btn btn-xs btn-outline-primary"><i class="bi bi-play-fill"></i></a> }
-                                                else { <a asp-controller="Matches" asp-action="Court" asp-route-id="@match.Id" class="btn btn-xs btn-outline-secondary"><i class="bi bi-display"></i></a> }
+                                            <td class="text-end" style="white-space:nowrap">
+                                                @if (match == null) { <a asp-action="StartTournamentMatch" asp-route-id="@Model.Id" asp-route-tournamentMatchId="@tm.Id" class="btn btn-xs btn-outline-primary me-1"><i class="bi bi-play-fill"></i></a> }
+                                                else { <a asp-controller="Matches" asp-action="Court" asp-route-id="@match.Id" class="btn btn-xs btn-outline-secondary me-1"><i class="bi bi-display"></i></a> }
+                                                <form asp-action="DeletePoolMatch" method="post" class="d-inline" onsubmit="return confirm('Delete this match?')">
+                                                    <input type="hidden" name="id" value="@Model.Id" />
+                                                    <input type="hidden" name="tournamentMatchId" value="@tm.Id" />
+                                                    <button type="submit" class="btn btn-xs btn-outline-danger" title="Delete match">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     }
@@ -291,6 +302,14 @@
                         </div>
                     </div>
                 }
+
+                <!-- Generate Knockouts button (bottom of pool matches) -->
+                <form asp-action="GenerateKnockouts" asp-route-id="@Model.Id" method="post" class="mb-3">
+                    <button type="submit" class="btn btn-warning btn-sm w-100"
+                            onclick="return confirm('Generate knockout bracket from current standings?')">
+                        <i class="bi bi-trophy me-1"></i>Generate Knockouts
+                    </button>
+                </form>
             }
 
             @if (hasKnockouts)

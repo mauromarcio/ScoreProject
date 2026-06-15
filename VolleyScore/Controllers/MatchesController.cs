@@ -215,8 +215,9 @@ public class MatchesController : Controller
             .Where(pp => pp.SetNumber == currentSet.SetNumber && pp.Side == "Away")
             .ToList();
 
+        int posCount = match.IsDoubles ? 2 : 6;
         List<PositionDto> BuildPositions(List<PlayerPosition> positions) =>
-            Enumerable.Range(1, 6).Select(pos =>
+            Enumerable.Range(1, posCount).Select(pos =>
             {
                 var assigned = positions.FirstOrDefault(p => p.Position == pos);
                 return new PositionDto

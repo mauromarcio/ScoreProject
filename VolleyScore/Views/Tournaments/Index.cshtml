@@ -66,6 +66,12 @@
                             <a asp-action="Report" asp-route-id="@t.Id" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-bar-chart me-1"></i>Report
                             </a>
+                            <form asp-action="Delete" asp-route-id="@t.Id" method="post" class="d-inline ms-auto"
+                                  onsubmit="return confirm('Delete \'@t.Name\'? All related data will be removed.')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete tournament">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>

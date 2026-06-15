@@ -151,32 +151,42 @@ public class ScoreController : Controller
             // If the team that was NOT serving wins the rally → they earn the serve and rotate
             if (scorerIsHome != serverIsHome)
             {
+                int rotMod = match!.IsDoubles ? 2 : 6;
                 if (scorerIsHome)
                 {
                     // Home team earns serve: rotate home players
                     currentSet.HomeIsServing = true;
-                    currentSet.HomeRotationIndex = (currentSet.HomeRotationIndex + 1) % 6;
-                    match!.ServingTeamId = match.HomeTeamId;
-                    await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex);
+                    currentSet.HomeRotationIndex = (currentSet.HomeRotationIndex + 1) % rotMod;
+                    match.ServingTeamId = match.HomeTeamId;
+                    await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles);
                 }
                 else
                 {
                     // Away team earns serve: rotate away players
                     currentSet.HomeIsServing = false;
-                    currentSet.AwayRotationIndex = (currentSet.AwayRotationIndex + 1) % 6;
-                    match!.ServingTeamId = match.AwayTeamId;
-                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex);
+                    currentSet.AwayRotationIndex = (currentSet.AwayRotationIndex + 1) % rotMod;
+                    match.ServingTeamId = match.AwayTeamId;
+                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles);
                 }
             }
 
             // ── Check for set win ─────────────────────────────────────────────
-            // The deciding set (only when TotalSets >= 3) is played to 15; all others to 25.
-            int winThreshold = (match!.TotalSets > 2 && match.CurrentSetNumber == match.TotalSets) ? 15 : 25;
             int homeS = currentSet.HomeScore;
             int awayS = currentSet.AwayScore;
+            int target = match!.PointsToWin;
+            int cap = match.PointsCap;
 
-            bool homeWinsSet = homeS >= winThreshold && (homeS - awayS) >= 2;
-            bool awayWinsSet = awayS >= winThreshold && (awayS - homeS) >= 2;
+            bool homeWinsSet, awayWinsSet;
+            if (cap > 0 && (homeS >= cap || awayS >= cap))
+            {
+                homeWinsSet = homeS > awayS;
+                awayWinsSet = awayS > homeS;
+            }
+            else
+            {
+                homeWinsSet = homeS >= target && (homeS - awayS) >= 2;
+                awayWinsSet = awayS >= target && (awayS - homeS) >= 2;
+            }
 
             if (homeWinsSet || awayWinsSet)
             {
@@ -249,9 +259,10 @@ public class ScoreController : Controller
     /// against the unique index on (MatchId, SetNumber, Side, Position).
     /// EF Core always executes DELETEs before INSERTs in the same SaveChanges batch,
     /// so there is no transient unique-constraint conflict.
-    /// Rotation map: 1→6, 2→1, 3→2, 4→3, 5→4, 6→5
+    /// Standard rotation map: 1→6, 2→1, 3→2, 4→3, 5→4, 6→5
+    /// Doubles rotation map: 1→2, 2→1
     /// </summary>
-    private async Task RotatePlayers(int matchId, int setNumber, string side, int rotationIndex)
+    private async Task RotatePlayers(int matchId, int setNumber, string side, int rotationIndex, bool isDoubles = false)
     {
         var positions = await _context.PlayerPositions
             .Where(pp => pp.MatchId == matchId && pp.SetNumber == setNumber && pp.Side == side)
@@ -271,16 +282,9 @@ public class ScoreController : Controller
                 SetNumber = pp.SetNumber,
                 PlayerId  = pp.PlayerId,
                 Side      = pp.Side,
-                Position  = pp.Position switch
-                {
-                    1 => 6,
-                    2 => 1,
-                    3 => 2,
-                    4 => 3,
-                    5 => 4,
-                    6 => 5,
-                    _ => pp.Position
-                }
+                Position  = isDoubles
+                    ? pp.Position switch { 1 => 2, 2 => 1, _ => pp.Position }
+                    : pp.Position switch { 1 => 6, 2 => 1, 3 => 2, 4 => 3, 5 => 4, 6 => 5, _ => pp.Position }
             });
         }
     }
@@ -341,8 +345,9 @@ public class ScoreController : Controller
             .Where(pp => pp.MatchId == match.Id && pp.SetNumber == set.SetNumber && pp.Side == "Away")
             .ToListAsync();
 
+        int posCount = match.IsDoubles ? 2 : 6;
         List<PositionDto> ToPositionDtos(List<PlayerPosition> positions) =>
-            Enumerable.Range(1, 6).Select(pos =>
+            Enumerable.Range(1, posCount).Select(pos =>
             {
                 var pp = positions.FirstOrDefault(p => p.Position == pos);
                 return new PositionDto

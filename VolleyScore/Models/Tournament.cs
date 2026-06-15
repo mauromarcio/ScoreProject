@@ -53,6 +53,14 @@ public class Tournament
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
+    [Range(1, 99)]
+    [Display(Name = "Points to Win Set")]
+    public int PointsToWin { get; set; } = 25;
+
+    [Range(0, 99)]
+    [Display(Name = "Point Cap (0 = no cap)")]
+    public int PointsCap { get; set; } = 0;
+
     // Navigation
     public ICollection<TournamentTeam> TournamentTeams { get; set; } = new List<TournamentTeam>();
     public ICollection<Pool> Pools { get; set; } = new List<Pool>();

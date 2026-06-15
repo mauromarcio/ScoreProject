@@ -46,7 +46,7 @@
                     </div>
                 </div>
 
-                <div class="row g-3 mb-4">
+                <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label asp-for="TotalSets" class="form-label fw-semibold">Sets to Play</label>
                         <select asp-for="TotalSets" class="form-select">
@@ -67,6 +67,29 @@
                                class="form-control" placeholder="0" />
                         <span asp-validation-for="InitialScore" class="text-danger small"></span>
                         <div class="form-text">Both teams start each set at this score. 0 = normal.</div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label asp-for="PointsToWin" class="form-label fw-semibold">Points to Win Set</label>
+                        <select asp-for="PointsToWin" class="form-select">
+                            <option value="11">11 (quick)</option>
+                            <option value="15">15 (deciding set)</option>
+                            <option value="21">21 (beach)</option>
+                            <option value="25" selected>25 (standard)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="PointsCap" class="form-label fw-semibold">Point Cap (0 = no cap)</label>
+                        <select asp-for="PointsCap" class="form-select">
+                            <option value="0" selected>No cap</option>
+                            <option value="23">23</option>
+                            <option value="27">27</option>
+                            <option value="28">28</option>
+                            <option value="30">30</option>
+                        </select>
+                        <div class="form-text">Team reaching cap wins regardless of lead.</div>
                     </div>
                 </div>
 

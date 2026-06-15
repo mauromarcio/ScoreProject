@@ -55,6 +55,29 @@
                 saveTimeout = setTimeout(saveAllPoolOrders, 300);
             }
         }).disableSelection();
+
+        // Make match rows sortable within each pool
+        $('.sortable-match-list').sortable({
+            handle: '.match-drag-handle',
+            helper: 'clone',
+            tolerance: 'pointer',
+            cursor: 'grabbing',
+            placeholder: 'match-row-placeholder',
+            revert: 150,
+            stop: function () {
+                var matchIds = [];
+                $(this).find('.match-row').each(function () {
+                    matchIds.push(parseInt($(this).data('match-id'), 10));
+                });
+                $.ajax({
+                    url: '/Tournaments/ReorderPoolMatches',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ matchIds: matchIds }),
+                    error: function () { console.warn('Failed to save match order'); }
+                });
+            }
+        }).disableSelection();
     });
 
 })();
