@@ -1,0 +1,14 @@
+# Claude Code internal tooling
+.claude/
+
+# .NET build output
+bin/
+obj/
+
+# User secrets
+appsettings.Development.json
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
