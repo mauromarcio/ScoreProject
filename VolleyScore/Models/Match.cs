@@ -56,6 +56,12 @@ public class Match
     /// </summary>
     public int? SetCap { get; set; }
 
+    /// <summary>
+    /// True for Doubles tournament matches (2v2). Only 2 players per side are required
+    /// to start the match instead of the standard 6.
+    /// </summary>
+    public bool IsDoubles { get; set; } = false;
+
     // Navigation properties
     [ForeignKey("HomeTeamId")]
     public Team? HomeTeam { get; set; }
@@ -73,11 +79,6 @@ public class Match
     public int AwaySetsWon => Sets.Count(s => s.WinnerTeamId == AwayTeamId);
     [NotMapped]
     public int SetsToWin => (TotalSets / 2) + 1;
-    /// <summary>
-    /// Maximum sets to play. Always equals TotalSets.
-    /// Odd TotalSets (1,3,5) = best-of with deciding set; first to SetsToWin wins.
-    /// Even TotalSets (2,4)  = play all sets, standings based on sets won (no tiebreaker).
-    /// </summary>
     [NotMapped]
     public int MaxSets => TotalSets;
 }

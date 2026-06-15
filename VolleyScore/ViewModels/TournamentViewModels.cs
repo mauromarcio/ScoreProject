@@ -32,6 +32,8 @@ public class TournamentBracketViewModel
 {
     public Tournament Tournament { get; set; } = null!;
     public List<TeamStanding> Standings { get; set; } = new();
+    /// <summary>Quarter-final matches (8-team bracket only)</summary>
+    public List<TournamentMatch> Quarterfinals { get; set; } = new();
     public List<TournamentMatch> Semifinals { get; set; } = new();
     public TournamentMatch? ThirdPlaceMatch { get; set; }
     public TournamentMatch? FinalMatch { get; set; }

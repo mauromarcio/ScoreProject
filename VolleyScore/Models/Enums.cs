@@ -33,5 +33,13 @@ public enum TournamentStage
     Pool = 0,
     Semifinal = 1,
     ThirdPlace = 2,
-    Final = 3
+    Final = 3,
+    Quarterfinal = 4   // 8-team bracket quarter-final round
+}
+
+/// <summary>Tournament format: indoor 6v6 (Singles) or beach/outdoor 2v2 (Doubles)</summary>
+public enum TournamentType
+{
+    Singles = 0,
+    Doubles = 1
 }

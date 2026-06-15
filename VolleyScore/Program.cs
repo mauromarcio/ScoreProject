@@ -7,7 +7,7 @@ using VolleyScore.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Services ──────────────────────────────────────────────────────────────────
+// ── Services ─────────────────────────────────────────────────────────────────────────────
 
 builder.Services.AddControllersWithViews();
 
@@ -27,7 +27,7 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
-// ── Database Initialisation ───────────────────────────────────────────────────
+// ── Database Initialisation ───────────────────────────────────────────────────────────────
 // Creates all tables if they do not exist (no migrations needed on first run).
 // Also applies safe ALTER TABLE additions for schema upgrades on existing databases.
 using (var scope = app.Services.CreateScope())
@@ -39,7 +39,7 @@ using (var scope = app.Services.CreateScope())
         // Create any missing tables (new installs get everything; existing databases keep their data)
         db.Database.EnsureCreated();
 
-        // ── Safe schema upgrades for existing databases ───────────────────────
+        // ── Safe schema upgrades for existing databases ─────────────────────────────────────
         // Add InitialScore column to Matches if it doesn't exist yet
         db.Database.ExecuteSqlRaw(@"
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'InitialScore')
@@ -50,6 +50,8 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE Matches ADD DeletedAt DATETIME2 NULL;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'SetCap')
                 ALTER TABLE Matches ADD SetCap INT NULL;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Matches' AND COLUMN_NAME = 'IsDoubles')
+                ALTER TABLE Matches ADD IsDoubles BIT NOT NULL DEFAULT 0;
         ");
 
         // Create Tournament tables if they don't exist (EnsureCreated only creates
@@ -61,9 +63,14 @@ using (var scope = app.Services.CreateScope())
                     Id INT IDENTITY(1,1) PRIMARY KEY,
                     Name NVARCHAR(100) NOT NULL,
                     Description NVARCHAR(300) NULL,
+                    TournamentType INT NOT NULL DEFAULT 0,
                     PoolSetsPerMatch INT NOT NULL DEFAULT 2,
                     PlayoffSetsPerMatch INT NOT NULL DEFAULT 3,
                     InitialScore INT NOT NULL DEFAULT 0,
+                    NumberOfCourts INT NOT NULL DEFAULT 1,
+                    NumberOfPools INT NOT NULL DEFAULT 1,
+                    CrossPoolMatchCount INT NOT NULL DEFAULT 0,
+                    TeamsAdvancingPerPool INT NOT NULL DEFAULT 2,
                     Status INT NOT NULL DEFAULT 0,
                     CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
                 )
@@ -78,6 +85,7 @@ using (var scope = app.Services.CreateScope())
                     TournamentId INT NOT NULL REFERENCES Tournaments(Id) ON DELETE CASCADE,
                     TeamId INT NOT NULL REFERENCES Teams(Id),
                     SeedOrder INT NOT NULL DEFAULT 1,
+                    CourtNumber INT NOT NULL DEFAULT 1,
                     CONSTRAINT UQ_TournamentTeam UNIQUE (TournamentId, TeamId)
                 )
             END
@@ -112,6 +120,14 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE Tournaments ADD Status INT NOT NULL DEFAULT 0;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'CreatedAt')
                 ALTER TABLE Tournaments ADD CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE();
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'TournamentType')
+                ALTER TABLE Tournaments ADD TournamentType INT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'NumberOfPools')
+                ALTER TABLE Tournaments ADD NumberOfPools INT NOT NULL DEFAULT 1;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'CrossPoolMatchCount')
+                ALTER TABLE Tournaments ADD CrossPoolMatchCount INT NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Tournaments' AND COLUMN_NAME = 'TeamsAdvancingPerPool')
+                ALTER TABLE Tournaments ADD TeamsAdvancingPerPool INT NOT NULL DEFAULT 2;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentTeams' AND COLUMN_NAME = 'SeedOrder')
                 ALTER TABLE TournamentTeams ADD SeedOrder INT NOT NULL DEFAULT 1;
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentMatches' AND COLUMN_NAME = 'Stage')
@@ -132,7 +148,7 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE Tournaments ADD NumberOfCourts INT NOT NULL DEFAULT 1;
         ");
 
-        // ── TeamRotations table for initial lineup feature ────────────────────
+        // ── TeamRotations table for initial lineup feature ──────────────────────────────────
         db.Database.ExecuteSqlRaw(@"
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'TeamRotations')
             BEGIN
@@ -152,7 +168,8 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ── Middleware Pipeline ───────────────────────────────────────────────────────
+// ── Middleware Pipeline ───────────────────────────────────────────────────────────────────
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -165,7 +182,8 @@ app.UseRouting();
 app.UseSession();
 app.UseAuthorization();
 
-// ── Routes ────────────────────────────────────────────────────────────────────
+// ── Routes ───────────────────────────────────────────────────────────────────────────────
+
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
