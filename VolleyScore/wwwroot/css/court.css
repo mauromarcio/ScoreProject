@@ -10,6 +10,25 @@
     background: #f0f2f5;
 }
 
+/* ── Switch-sides cue (Doubles) ──────────────────────────────────────────── */
+.switch-sides-cue {
+    text-align: center;
+    padding: 0.25rem 1rem;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border-bottom: 2px solid #f59e0b;
+    flex-shrink: 0;
+    animation: cue-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes cue-pulse {
+    0%, 100% { background: #fef3c7; }
+    50%       { background: #fde68a; }
+}
+
 /* ── Top score area ───────────────────────────────────────────────────────── */
 .score-area {
     display: flex;

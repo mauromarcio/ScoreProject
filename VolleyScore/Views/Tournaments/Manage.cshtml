@@ -8,6 +8,9 @@
     bool hasSchedule = Model.TournamentMatches.Any(tm => tm.Phase == TournamentPhase.Pool);
     bool hasPools = Model.Pools.Any();
     bool hasKnockouts = Model.TournamentMatches.Any(tm => tm.Phase != TournamentPhase.Pool);
+    bool hasQFs = Model.TournamentMatches.Any(tm => tm.Phase == TournamentPhase.QuarterFinal);
+    bool isDoubles = Model.TournamentType == TournamentType.Doubles;
+    var crossPoolMatches = Model.TournamentMatches.Where(tm => tm.Phase == TournamentPhase.Pool && tm.PoolId == null).ToList();
 }
 
 @section Styles {
@@ -25,9 +28,11 @@
             <div>
                 <h2 class="mb-0">@Model.Name</h2>
                 <small class="text-muted">
-                    @Model.TournamentTeams.Count teams &nbsp;|&nbsp;
+                    @if (isDoubles) { <span class="badge me-1" style="background:#0d9488"><i class="bi bi-person-arms-up me-1"></i>Doubles</span> }
+                    @Model.TournamentTeams.Count @(isDoubles ? "pairs" : "teams") &nbsp;|&nbsp;
                     @Model.SetsPerMatch sets/match
                     @if (Model.InitialScore > 0) { <span>&nbsp;|&nbsp;+@Model.InitialScore handicap</span> }
+                    @if (isDoubles) { <span>&nbsp;|&nbsp;@Model.NumberOfPools pools</span> }
                     &nbsp;|&nbsp; Status: <strong>@Model.Status</strong>
                 </small>
             </div>
@@ -98,13 +103,26 @@
                 <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-grid-3x3-gap me-1"></i>Pools</span>
                     <div class="d-flex gap-2">
-                        <form asp-action="SuggestPools" asp-route-id="@Model.Id" method="post" class="d-flex gap-1">
-                            <input type="number" name="poolSize" value="4" min="2" max="20"
-                                   class="form-control form-control-sm" style="width:60px" title="Teams per pool" />
-                            <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
-                                <i class="bi bi-magic me-1"></i>Auto
-                            </button>
-                        </form>
+                        @if (isDoubles)
+                        {
+                            <form asp-action="SuggestPools" asp-route-id="@Model.Id" method="post">
+                                <input type="hidden" name="poolSize" value="0" />
+                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap"
+                                        title="Distribute evenly into @Model.NumberOfPools pool(s)">
+                                    <i class="bi bi-magic me-1"></i>Distribute (@Model.NumberOfPools pools)
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form asp-action="SuggestPools" asp-route-id="@Model.Id" method="post" class="d-flex gap-1">
+                                <input type="number" name="poolSize" value="4" min="2" max="20"
+                                       class="form-control form-control-sm" style="width:60px" title="Teams per pool" />
+                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
+                                    <i class="bi bi-magic me-1"></i>Auto
+                                </button>
+                            </form>
+                        }
                     </div>
                 </div>
                 <div class="card-body p-2">
@@ -157,6 +175,10 @@
                 <div class="card mb-3">
                     <div class="card-header fw-semibold">
                         <i class="bi bi-calendar-week me-1"></i>Pool Matches
+                        @if (isDoubles && crossPoolMatches.Any())
+                        {
+                            <span class="badge bg-secondary ms-1">Pool only</span>
+                        }
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-sm table-hover mb-0">
@@ -171,7 +193,7 @@
                             </thead>
                             <tbody>
                                 @foreach (var tm in Model.TournamentMatches
-                                    .Where(x => x.Phase == TournamentPhase.Pool)
+                                    .Where(x => x.Phase == TournamentPhase.Pool && x.PoolId != null)
                                     .OrderBy(x => x.SortOrder))
                                 {
                                     var match = tm.Match;
@@ -231,6 +253,44 @@
                         </form>
                     </div>
                 </div>
+
+                @if (isDoubles && crossPoolMatches.Any())
+                {
+                    <!-- Cross-pool matches (Doubles) -->
+                    <div class="card mb-3">
+                        <div class="card-header fw-semibold">
+                            <i class="bi bi-shuffle me-1"></i>Cross-Pool Matches
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr><th>Match</th><th>Home</th><th>Away</th><th>Result</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var tm in crossPoolMatches.OrderBy(x => x.SortOrder))
+                                    {
+                                        var match = tm.Match;
+                                        bool done = match?.Status == MatchStatus.Completed;
+                                        <tr class="@(done ? "table-success" : "")">
+                                            <td class="small text-muted">@tm.Label</td>
+                                            <td class="small">@tm.HomeTeam?.Name</td>
+                                            <td class="small">@tm.AwayTeam?.Name</td>
+                                            <td class="small">
+                                                @if (done && match != null) { int h = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId); int a = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId); <strong>@h – @a</strong> }
+                                                else if (match?.Status == MatchStatus.InProgress) { <span class="badge bg-warning text-dark">Live</span> }
+                                                else { <span class="text-muted">–</span> }
+                                            </td>
+                                            <td>
+                                                @if (match == null) { <a asp-action="StartTournamentMatch" asp-route-id="@Model.Id" asp-route-tournamentMatchId="@tm.Id" class="btn btn-xs btn-outline-primary"><i class="bi bi-play-fill"></i></a> }
+                                                else { <a asp-controller="Matches" asp-action="Court" asp-route-id="@match.Id" class="btn btn-xs btn-outline-secondary"><i class="bi bi-display"></i></a> }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
             }
 
             @if (hasKnockouts)
@@ -239,6 +299,7 @@
                 <div class="card">
                     <div class="card-header fw-semibold">
                         <i class="bi bi-trophy me-1"></i>Knockouts
+                        @if (hasQFs) { <span class="badge bg-primary ms-1">8-team bracket</span> }
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-sm table-hover mb-0">
@@ -254,14 +315,15 @@
                             <tbody>
                                 @foreach (var tm in Model.TournamentMatches
                                     .Where(x => x.Phase != TournamentPhase.Pool)
-                                    .OrderBy(x => x.SortOrder))
+                                    .OrderBy(x => x.Phase == TournamentPhase.QuarterFinal ? 0 : x.Phase == TournamentPhase.SemiFinal ? 1 : x.Phase == TournamentPhase.ThirdPlace ? 2 : x.Phase == TournamentPhase.Final ? 3 : 4)
+                                    .ThenBy(x => x.SortOrder))
                                 {
                                     var match = tm.Match;
                                     bool done = match?.Status == MatchStatus.Completed;
-                                    string homeLabel = tm.HomeTeam?.Name
-                                        ?? (tm.HomeSourceMatchId.HasValue ? $"W/{tm.Label}" : "TBD");
-                                    string awayLabel = tm.AwayTeam?.Name
-                                        ?? (tm.AwaySourceMatchId.HasValue ? $"W/{tm.Label}" : "TBD");
+                                    var srcHome = tm.HomeSourceMatchId.HasValue ? Model.TournamentMatches.FirstOrDefault(x => x.Id == tm.HomeSourceMatchId) : null;
+                                    var srcAway = tm.AwaySourceMatchId.HasValue ? Model.TournamentMatches.FirstOrDefault(x => x.Id == tm.AwaySourceMatchId) : null;
+                                    string homeLabel = tm.HomeTeam?.Name ?? (srcHome != null ? $"{(tm.HomeFromWinner ? "W" : "L")}/{srcHome.Label}" : "TBD");
+                                    string awayLabel = tm.AwayTeam?.Name ?? (srcAway != null ? $"{(tm.AwayFromWinner ? "W" : "L")}/{srcAway.Label}" : "TBD");
                                     <tr class="@(done ? "table-success" : "")">
                                         <td class="small fw-semibold">@tm.Label</td>
                                         <td class="small">@homeLabel</td>

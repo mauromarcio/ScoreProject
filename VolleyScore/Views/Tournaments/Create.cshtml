@@ -4,7 +4,7 @@
     ViewData["Title"] = "New Tournament";
 }
 
-<div class="container py-4" style="max-width:560px">
+<div class="container py-4" style="max-width:600px">
     <div class="d-flex align-items-center mb-4">
         <a asp-action="Index" class="btn btn-outline-secondary btn-sm me-3">
             <i class="bi bi-arrow-left"></i>
@@ -30,10 +30,33 @@
                     <span asp-validation-for="Description" class="text-danger small"></span>
                 </div>
 
+                <!-- Tournament Type -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Tournament Type</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="TournamentType" id="typeSingles"
+                                   value="0" checked onchange="onTypeChange()">
+                            <label class="form-check-label" for="typeSingles">
+                                <i class="bi bi-people me-1"></i>Singles (6v6)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="TournamentType" id="typeDoubles"
+                                   value="1" onchange="onTypeChange()">
+                            <label class="form-check-label" for="typeDoubles">
+                                <i class="bi bi-person-arms-up me-1"></i>Doubles (2v2)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Common settings -->
                 <div class="row g-3 mb-3">
                     <div class="col-md-4">
-                        <label asp-for="MaxTeams" class="form-label fw-semibold">Max Teams</label>
-                        <input asp-for="MaxTeams" type="number" min="2" max="50" class="form-control" />
+                        <label asp-for="MaxTeams" class="form-label fw-semibold" id="lblMaxTeams">Max Teams</label>
+                        <input asp-for="MaxTeams" type="number" min="2" max="50" class="form-control" id="inpMaxTeams" />
+                        <div class="form-text" id="hintMaxTeams">2–50 teams</div>
                         <span asp-validation-for="MaxTeams" class="text-danger small"></span>
                     </div>
                     <div class="col-md-4">
@@ -45,13 +68,38 @@
                             <option value="4">Best of 4</option>
                             <option value="5">Best of 5</option>
                         </select>
-                        <span asp-validation-for="SetsPerMatch" class="text-danger small"></span>
                     </div>
                     <div class="col-md-4">
                         <label asp-for="InitialScore" class="form-label fw-semibold">Handicap</label>
                         <input asp-for="InitialScore" type="number" min="0" max="24" class="form-control" />
-                        <span asp-validation-for="InitialScore" class="text-danger small"></span>
                         <div class="form-text">Both teams start each set at this score.</div>
+                    </div>
+                </div>
+
+                <!-- Doubles-only settings -->
+                <div id="doublesSection" class="border rounded p-3 mb-3 bg-light" style="display:none">
+                    <div class="fw-semibold mb-2 text-primary">
+                        <i class="bi bi-person-arms-up me-1"></i>Doubles Configuration
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label asp-for="NumberOfPools" class="form-label fw-semibold">Number of Pools</label>
+                            <input asp-for="NumberOfPools" type="number" min="1" max="20" class="form-control" value="2" />
+                            <div class="form-text">Teams will be distributed evenly.</div>
+                            <span asp-validation-for="NumberOfPools" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="CrossPoolMatchCount" class="form-label fw-semibold">Cross-Pool Matches</label>
+                            <input asp-for="CrossPoolMatchCount" type="number" min="0" max="20" class="form-control" value="0" />
+                            <div class="form-text">Pairs from one pool vs another.</div>
+                            <span asp-validation-for="CrossPoolMatchCount" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="TeamsAdvancingPerPool" class="form-label fw-semibold">Advance per Pool</label>
+                            <input asp-for="TeamsAdvancingPerPool" type="number" min="1" max="8" class="form-control" value="2" />
+                            <div class="form-text">Teams advancing to playoffs.</div>
+                            <span asp-validation-for="TeamsAdvancingPerPool" class="text-danger small"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -68,4 +116,35 @@
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        function onTypeChange() {
+            var isDoubles = document.getElementById('typeDoubles').checked;
+            var doublesSection = document.getElementById('doublesSection');
+            var inp = document.getElementById('inpMaxTeams');
+            var hint = document.getElementById('hintMaxTeams');
+            var lbl = document.getElementById('lblMaxTeams');
+
+            if (isDoubles) {
+                doublesSection.style.display = 'block';
+                inp.min = 4;
+                inp.max = 80;
+                if (parseInt(inp.value) < 4) inp.value = 8;
+                if (parseInt(inp.value) > 80) inp.value = 80;
+                hint.textContent = '4–80 doubles pairs';
+                lbl.textContent = 'Max Pairs';
+            } else {
+                doublesSection.style.display = 'none';
+                inp.min = 2;
+                inp.max = 50;
+                if (parseInt(inp.value) > 50) inp.value = 50;
+                hint.textContent = '2–50 teams';
+                lbl.textContent = 'Max Teams';
+            }
+        }
+
+        // Restore state if validation failed and page was re-rendered with Doubles selected
+        document.addEventListener('DOMContentLoaded', function () {
+            if (document.getElementById('typeDoubles').checked) onTypeChange();
+        });
+    </script>
 }

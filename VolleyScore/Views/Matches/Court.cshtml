@@ -42,7 +42,8 @@
         awaySetsWon: @Model.AwaySetsWon,
         totalSets: @Model.TotalSets,
         homeScore: @Model.CurrentSet.HomeScore,
-        awayScore: @Model.CurrentSet.AwayScore
+        awayScore: @Model.CurrentSet.AwayScore,
+        isDoubles: @Model.Match.IsDoubles.ToString().ToLower()
     };
 </script>
 
@@ -145,6 +146,11 @@
             </div>
             <div class="team-name-header" id="rightTeamName">@rightTeam.Name</div>
         </div>
+    </div>
+
+    <!-- ── Switch-sides cue (Doubles only) ──────────────────────────────── -->
+    <div id="switchSidesCue" class="switch-sides-cue" style="display:none">
+        <i class="bi bi-arrow-left-right me-1"></i>Switch Sides
     </div>
 
     <!-- ── Main court area ────────────────────────────────────────────────── -->

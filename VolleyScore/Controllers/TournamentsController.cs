@@ -42,6 +42,20 @@ public class TournamentsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Tournament tournament)
     {
+        // Enforce per-type team count limits
+        if (tournament.TournamentType == TournamentType.Doubles)
+        {
+            if (tournament.MaxTeams < 4)
+                ModelState.AddModelError("MaxTeams", "Doubles tournaments require at least 4 doubles pairs.");
+            if (tournament.MaxTeams > 80)
+                ModelState.AddModelError("MaxTeams", "Doubles tournaments allow at most 80 doubles pairs.");
+        }
+        else
+        {
+            if (tournament.MaxTeams > 50)
+                ModelState.AddModelError("MaxTeams", "Singles tournaments allow at most 50 teams.");
+        }
+
         if (!ModelState.IsValid) return View(tournament);
 
         tournament.Status = TournamentStatus.Setup;
@@ -141,18 +155,25 @@ public class TournamentsController : Controller
 
     // ── Pool management ───────────────────────────────────────────────────────
 
-    /// <summary>Auto-distribute enrolled teams into pools of the requested size.</summary>
+    /// <summary>Auto-distribute enrolled teams into pools of the requested size.
+    /// For Doubles tournaments, pass poolSize=0 to use the tournament's NumberOfPools setting.</summary>
     [HttpPost]
     public async Task<IActionResult> SuggestPools(int id, int poolSize = 4)
     {
-        poolSize = Math.Clamp(poolSize, 2, 20);
-
         var tournament = await _context.Tournaments
             .Include(t => t.TournamentTeams)
             .Include(t => t.Pools).ThenInclude(p => p.PoolTeams)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (tournament == null) return NotFound();
+
+        // For Doubles or when poolSize=0, derive pool size from NumberOfPools
+        if (poolSize <= 0 || tournament.TournamentType == TournamentType.Doubles)
+        {
+            int pools = Math.Max(1, tournament.NumberOfPools);
+            poolSize = (int)Math.Ceiling((double)tournament.TournamentTeams.Count / pools);
+        }
+        poolSize = Math.Clamp(poolSize, 2, 40);
 
         // Remove existing pool structure
         _context.Pools.RemoveRange(tournament.Pools);
@@ -234,7 +255,9 @@ public class TournamentsController : Controller
         await _context.SaveChangesAsync();
 
         int sort = 0;
-        foreach (var pool in tournament.Pools.OrderBy(p => p.SortOrder))
+        var orderedPools = tournament.Pools.OrderBy(p => p.SortOrder).ToList();
+
+        foreach (var pool in orderedPools)
         {
             var teamIds = pool.PoolTeams
                 .OrderBy(pt => pt.SortOrder)
@@ -255,6 +278,47 @@ public class TournamentsController : Controller
                     Label = $"{pool.Name} M{matchNum++}",
                     SortOrder = sort++
                 });
+            }
+        }
+
+        // Cross-pool matches for Doubles tournaments
+        if (tournament.TournamentType == TournamentType.Doubles && tournament.CrossPoolMatchCount > 0)
+        {
+            for (int i = 0; i < orderedPools.Count; i++)
+            {
+                for (int j = i + 1; j < orderedPools.Count; j++)
+                {
+                    var poolA = orderedPools[i];
+                    var poolB = orderedPools[j];
+                    string labelA = poolA.Name.Replace("Pool ", "");
+                    string labelB = poolB.Name.Replace("Pool ", "");
+
+                    var teamsA = poolA.PoolTeams
+                        .OrderBy(pt => pt.SortOrder)
+                        .Select(pt => pt.TournamentTeam!.TeamId)
+                        .Take(tournament.CrossPoolMatchCount)
+                        .ToList();
+                    var teamsB = poolB.PoolTeams
+                        .OrderBy(pt => pt.SortOrder)
+                        .Select(pt => pt.TournamentTeam!.TeamId)
+                        .Take(tournament.CrossPoolMatchCount)
+                        .ToList();
+
+                    int crossNum = 1;
+                    for (int k = 0; k < Math.Min(teamsA.Count, teamsB.Count); k++)
+                    {
+                        _context.TournamentMatches.Add(new TournamentMatch
+                        {
+                            TournamentId = id,
+                            PoolId = null,
+                            Phase = TournamentPhase.Pool,
+                            HomeTeamId = teamsA[k],
+                            AwayTeamId = teamsB[k],
+                            Label = $"Cross {labelA}/{labelB} M{crossNum++}",
+                            SortOrder = sort++
+                        });
+                    }
+                }
             }
         }
 
@@ -304,7 +368,8 @@ public class TournamentsController : Controller
             Status = MatchStatus.Setup,
             CurrentSetNumber = 1,
             HomeTeamOnLeft = true,
-            ServingTeamId = homeTeamId.Value
+            ServingTeamId = homeTeamId.Value,
+            IsDoubles = tournament.TournamentType == TournamentType.Doubles
         };
         _context.Matches.Add(match);
         await _context.SaveChangesAsync();
@@ -365,62 +430,46 @@ public class TournamentsController : Controller
         }
 
         int sort = 1000;
+        int totalAdvancing = tournament.TeamsAdvancingPerPool * tournament.Pools.Count;
+        bool useQF = totalAdvancing >= 8 && standings.Count >= 8;
 
-        // Semi-final 1: 1st vs 4th
-        var sf1 = new TournamentMatch
+        if (useQF)
         {
-            TournamentId = id,
-            Phase = TournamentPhase.SemiFinal,
-            Label = "Semi-Final 1",
-            HomeTeamId = standings[0].TeamId,
-            AwayTeamId = standings[3].TeamId,
-            SortOrder = sort++
-        };
-        _context.TournamentMatches.Add(sf1);
+            // Quarter-final bracket (8 teams): QF → SF → Final
+            // Seedings: QF1=1v8, QF2=4v5, QF3=2v7, QF4=3v6
+            var qf1 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "QF 1", HomeTeamId = standings[0].TeamId, AwayTeamId = standings[7].TeamId, SortOrder = sort++ };
+            var qf2 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "QF 2", HomeTeamId = standings[3].TeamId, AwayTeamId = standings[4].TeamId, SortOrder = sort++ };
+            var qf3 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "QF 3", HomeTeamId = standings[1].TeamId, AwayTeamId = standings[6].TeamId, SortOrder = sort++ };
+            var qf4 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "QF 4", HomeTeamId = standings[2].TeamId, AwayTeamId = standings[5].TeamId, SortOrder = sort++ };
+            _context.TournamentMatches.AddRange(qf1, qf2, qf3, qf4);
+            await _context.SaveChangesAsync();
 
-        // Semi-final 2: 2nd vs 3rd
-        var sf2 = new TournamentMatch
-        {
-            TournamentId = id,
-            Phase = TournamentPhase.SemiFinal,
-            Label = "Semi-Final 2",
-            HomeTeamId = standings[1].TeamId,
-            AwayTeamId = standings[2].TeamId,
-            SortOrder = sort++
-        };
-        _context.TournamentMatches.Add(sf2);
-        await _context.SaveChangesAsync();
+            var sf1 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.SemiFinal, Label = "Semi-Final 1", HomeSourceMatchId = qf1.Id, HomeFromWinner = true, AwaySourceMatchId = qf2.Id, AwayFromWinner = true, SortOrder = sort++ };
+            var sf2 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.SemiFinal, Label = "Semi-Final 2", HomeSourceMatchId = qf3.Id, HomeFromWinner = true, AwaySourceMatchId = qf4.Id, AwayFromWinner = true, SortOrder = sort++ };
+            _context.TournamentMatches.AddRange(sf1, sf2);
+            await _context.SaveChangesAsync();
 
-        // Final: winner of SF1 vs winner of SF2
-        _context.TournamentMatches.Add(new TournamentMatch
+            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.Final, Label = "Final", HomeSourceMatchId = sf1.Id, HomeFromWinner = true, AwaySourceMatchId = sf2.Id, AwayFromWinner = true, SortOrder = sort++ });
+            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.ThirdPlace, Label = "3rd Place", HomeSourceMatchId = sf1.Id, HomeFromWinner = false, AwaySourceMatchId = sf2.Id, AwayFromWinner = false, SortOrder = sort++ });
+        }
+        else
         {
-            TournamentId = id,
-            Phase = TournamentPhase.Final,
-            Label = "Final",
-            HomeSourceMatchId = sf1.Id,
-            HomeFromWinner = true,
-            AwaySourceMatchId = sf2.Id,
-            AwayFromWinner = true,
-            SortOrder = sort++
-        });
+            // Semi-final bracket (4 teams): SF → Final
+            var sf1 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.SemiFinal, Label = "Semi-Final 1", HomeTeamId = standings[0].TeamId, AwayTeamId = standings[3].TeamId, SortOrder = sort++ };
+            var sf2 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.SemiFinal, Label = "Semi-Final 2", HomeTeamId = standings[1].TeamId, AwayTeamId = standings[2].TeamId, SortOrder = sort++ };
+            _context.TournamentMatches.AddRange(sf1, sf2);
+            await _context.SaveChangesAsync();
 
-        // 3rd place: loser of SF1 vs loser of SF2
-        _context.TournamentMatches.Add(new TournamentMatch
-        {
-            TournamentId = id,
-            Phase = TournamentPhase.ThirdPlace,
-            Label = "3rd Place",
-            HomeSourceMatchId = sf1.Id,
-            HomeFromWinner = false,
-            AwaySourceMatchId = sf2.Id,
-            AwayFromWinner = false,
-            SortOrder = sort++
-        });
+            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.Final, Label = "Final", HomeSourceMatchId = sf1.Id, HomeFromWinner = true, AwaySourceMatchId = sf2.Id, AwayFromWinner = true, SortOrder = sort++ });
+            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.ThirdPlace, Label = "3rd Place", HomeSourceMatchId = sf1.Id, HomeFromWinner = false, AwaySourceMatchId = sf2.Id, AwayFromWinner = false, SortOrder = sort++ });
+        }
 
         tournament.Status = TournamentStatus.Knockouts;
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = "Knockout bracket generated.";
+        TempData["Success"] = useQF
+            ? "Quarter-final bracket generated (8-team draw)."
+            : "Knockout bracket generated.";
         return RedirectToAction(nameof(Manage), new { id });
     }
 

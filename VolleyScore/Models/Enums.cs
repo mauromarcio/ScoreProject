@@ -33,5 +33,13 @@ public enum TournamentPhase
     Pool = 0,
     SemiFinal = 1,
     ThirdPlace = 2,
-    Final = 3
+    Final = 3,
+    QuarterFinal = 4
+}
+
+/// <summary>Determines the format of the tournament (indoor 6v6 or beach 2v2)</summary>
+public enum TournamentType
+{
+    Singles = 0,
+    Doubles = 1
 }

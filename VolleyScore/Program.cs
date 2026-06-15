@@ -166,6 +166,32 @@ static async Task ApplySchemaUpdates(VolleyScoreContext db)
         IF NOT EXISTS (SELECT 1 FROM sys.columns
                        WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'NumberOfCourts')
             ALTER TABLE Tournaments ADD NumberOfCourts INT NOT NULL DEFAULT 1;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'TournamentType')
+            ALTER TABLE Tournaments ADD TournamentType INT NOT NULL DEFAULT 0;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'NumberOfPools')
+            ALTER TABLE Tournaments ADD NumberOfPools INT NOT NULL DEFAULT 1;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'CrossPoolMatchCount')
+            ALTER TABLE Tournaments ADD CrossPoolMatchCount INT NOT NULL DEFAULT 0;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'TeamsAdvancingPerPool')
+            ALTER TABLE Tournaments ADD TeamsAdvancingPerPool INT NOT NULL DEFAULT 2;");
+
+    // ── Column additions for existing Matches tables ──────────────────────────
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Matches') AND name = N'IsDoubles')
+            ALTER TABLE Matches ADD IsDoubles BIT NOT NULL DEFAULT 0;");
 }
 
 // ── Middleware Pipeline ───────────────────────────────────────────────────────

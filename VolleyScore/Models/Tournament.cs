@@ -17,7 +17,7 @@ public class Tournament
     [StringLength(300)]
     public string? Description { get; set; }
 
-    [Range(2, 50, ErrorMessage = "Max teams must be between 2 and 50")]
+    [Range(2, 80, ErrorMessage = "Max teams must be between 2 and 80")]
     [Display(Name = "Maximum Teams")]
     public int MaxTeams { get; set; } = 50;
 
@@ -35,6 +35,21 @@ public class Tournament
     public int NumberOfCourts { get; set; } = 1;
 
     public TournamentStatus Status { get; set; } = TournamentStatus.Setup;
+
+    [Display(Name = "Tournament Type")]
+    public TournamentType TournamentType { get; set; } = TournamentType.Singles;
+
+    [Range(1, 20)]
+    [Display(Name = "Number of Pools")]
+    public int NumberOfPools { get; set; } = 1;
+
+    [Range(0, 20)]
+    [Display(Name = "Cross-Pool Matches per Pool Pair")]
+    public int CrossPoolMatchCount { get; set; } = 0;
+
+    [Range(1, 8)]
+    [Display(Name = "Teams Advancing per Pool")]
+    public int TeamsAdvancingPerPool { get; set; } = 2;
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 

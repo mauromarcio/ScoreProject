@@ -22,6 +22,7 @@
     var totalSets   = COURT_DATA.totalSets;
 
     var isBusy = false; // prevents double-clicks on score buttons
+    var isDoubles = COURT_DATA.isDoubles === true;
 
     // ── jQuery UI Drag & Drop ─────────────────────────────────────────────────
     function initDragDrop() {
@@ -244,6 +245,16 @@
         homeSetsWon = result.homeSetsWon;
         awaySetsWon = result.awaySetsWon;
 
+        // Switch-sides cue for Doubles: show when total score is divisible by 15
+        if (isDoubles) {
+            var total = result.homeScore + result.awayScore;
+            if (total > 0 && total % 15 === 0) {
+                showSwitchSidesCue();
+            } else {
+                hideSwitchSidesCue();
+            }
+        }
+
         // Handle set/match completion
         if (result.matchCompleted) {
             matchStatus = 'Completed';
@@ -395,6 +406,15 @@
         });
     };
 
+    // ── Switch-sides cue helpers ─────────────────────────────────────────────
+    function showSwitchSidesCue() {
+        $('#switchSidesCue').show();
+    }
+
+    function hideSwitchSidesCue() {
+        $('#switchSidesCue').hide();
+    }
+
     // ── Error toast ───────────────────────────────────────────────────────────
     function showError(msg) {
         $('#errorToastMessage').text(msg);
@@ -442,6 +462,12 @@
         // Set initial serving highlight on position 1
         var initServingLeft = homeTeamOnLeft ? homeIsServing : !homeIsServing;
         updateServingBadge(initServingLeft);
+
+        // Check initial score for switch-sides cue (Doubles)
+        if (isDoubles) {
+            var initTotal = homeScore + awayScore;
+            if (initTotal > 0 && initTotal % 15 === 0) showSwitchSidesCue();
+        }
     });
 
 })();

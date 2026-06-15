@@ -182,17 +182,19 @@ public class MatchesController : Controller
             .FirstOrDefaultAsync(m => m.Id == id);
         if (match == null) return NotFound();
 
-        // Validate: at least 6 players per side must be positioned
+        // Doubles matches require 2 players per side; standard matches require 6
+        int required = match.IsDoubles ? 2 : 6;
+
         var homeCount = match.PlayerPositions.Count(pp =>
             pp.SetNumber == match.CurrentSetNumber && pp.Side == "Home");
         var awayCount = match.PlayerPositions.Count(pp =>
             pp.SetNumber == match.CurrentSetNumber && pp.Side == "Away");
 
-        if (homeCount < 6 || awayCount < 6)
+        if (homeCount < required || awayCount < required)
             return BadRequest(new
             {
                 success = false,
-                error = $"Both teams need 6 players on court. Home: {homeCount}/6, Away: {awayCount}/6"
+                error = $"Both teams need {required} players on court. Home: {homeCount}/{required}, Away: {awayCount}/{required}"
             });
 
         match.Status = MatchStatus.InProgress;

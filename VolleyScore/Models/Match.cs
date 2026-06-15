@@ -47,6 +47,9 @@ public class Match
     /// <summary>Which team currently has serve (null = not yet assigned)</summary>
     public int? ServingTeamId { get; set; }
 
+    /// <summary>True for Doubles (beach 2v2) matches – only 2 players per side required to start.</summary>
+    public bool IsDoubles { get; set; } = false;
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation properties
