@@ -128,6 +128,39 @@
                     </div>
                 </div>
 
+                <!-- Knockout round set configuration -->
+                <div class="border rounded p-3 mb-4">
+                    <div class="fw-semibold mb-2 text-primary">
+                        <i class="bi bi-trophy me-1"></i>Knockout Rounds
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label asp-for="PlayoffSetsPerMatch" class="form-label fw-semibold">Quarter-finals</label>
+                            <select asp-for="PlayoffSetsPerMatch" class="form-select">
+                                <option value="1">1 set</option>
+                                <option value="3">Best of 3</option>
+                            </select>
+                            <div class="form-text">Sets per quarter-final match.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="SemifinalSetsPerMatch" class="form-label fw-semibold">Semi-finals</label>
+                            <select asp-for="SemifinalSetsPerMatch" class="form-select">
+                                <option value="1">1 set</option>
+                                <option value="3" selected>Best of 3</option>
+                            </select>
+                            <div class="form-text">Sets per semi-final &amp; 3rd-place match.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="FinalSetsPerMatch" class="form-label fw-semibold">Final</label>
+                            <select asp-for="FinalSetsPerMatch" class="form-select">
+                                <option value="1">1 set</option>
+                                <option value="3" selected>Best of 3</option>
+                            </select>
+                            <div class="form-text">Sets for the final match.</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2 mt-4">
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-lg me-1"></i> Create

@@ -198,12 +198,15 @@ public class ScoreController : Controller
                 int homeSets = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId);
                 int awaySets = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId);
                 int setsToWin = (match.TotalSets / 2) + 1;
+                bool allSetsPlayed = (homeSets + awaySets) >= match.TotalSets;
 
-                if (homeSets >= setsToWin || awaySets >= setsToWin)
+                if (homeSets >= setsToWin || awaySets >= setsToWin || allSetsPlayed)
                 {
                     match.Status = MatchStatus.Completed;
                     matchCompleted = true;
-                    winnerName = homeWinsSet ? match.HomeTeam!.Name : match.AwayTeam!.Name;
+                    winnerName = homeSets > awaySets ? match.HomeTeam!.Name
+                               : awaySets > homeSets ? match.AwayTeam!.Name
+                               : "Match Drawn";
                 }
                 else
                 {

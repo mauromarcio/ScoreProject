@@ -357,13 +357,23 @@ public class TournamentsController : Controller
             return RedirectToAction(nameof(Manage), new { id });
         }
 
+        // Pick set count based on phase
+        int sets = tm.Phase switch
+        {
+            TournamentPhase.QuarterFinal => tournament.PlayoffSetsPerMatch,
+            TournamentPhase.SemiFinal    => tournament.SemifinalSetsPerMatch,
+            TournamentPhase.ThirdPlace   => tournament.SemifinalSetsPerMatch,
+            TournamentPhase.Final        => tournament.FinalSetsPerMatch,
+            _                            => tournament.SetsPerMatch
+        };
+
         // Create the Match entity
         var match = new Match
         {
             MatchReference = tm.Label,
             HomeTeamId = homeTeamId.Value,
             AwayTeamId = awayTeamId.Value,
-            TotalSets = tournament.SetsPerMatch,
+            TotalSets = sets,
             InitialScore = tournament.InitialScore,
             Status = MatchStatus.Setup,
             CurrentSetNumber = 1,

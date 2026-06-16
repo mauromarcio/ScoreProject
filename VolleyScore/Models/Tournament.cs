@@ -61,6 +61,18 @@ public class Tournament
     [Display(Name = "Point Cap (0 = no cap)")]
     public int PointsCap { get; set; } = 0;
 
+    [Range(1, 5)]
+    [Display(Name = "Playoff Sets")]
+    public int PlayoffSetsPerMatch { get; set; } = 1;
+
+    [Range(1, 5)]
+    [Display(Name = "Semi-final Sets")]
+    public int SemifinalSetsPerMatch { get; set; } = 3;
+
+    [Range(1, 5)]
+    [Display(Name = "Final Sets")]
+    public int FinalSetsPerMatch { get; set; } = 3;
+
     // Navigation
     public ICollection<TournamentTeam> TournamentTeams { get; set; } = new List<TournamentTeam>();
     public ICollection<Pool> Pools { get; set; } = new List<Pool>();
