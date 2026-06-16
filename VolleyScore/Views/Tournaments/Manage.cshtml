@@ -185,8 +185,9 @@
                         .Where(x => x.Phase == TournamentPhase.Pool && x.PoolId == pool.Id)
                         .OrderBy(x => x.SortOrder)
                         .ToList();
-                    var poolTeams = pool.PoolTeams.OrderBy(pt => pt.SortOrder)
-                        .Select(pt => new { id = pt.TournamentTeam!.TeamId, name = pt.TournamentTeam!.Team?.Name ?? "" })
+                    var allTeams = Model.TournamentTeams
+                        .OrderBy(tt => tt.SeedPosition)
+                        .Select(tt => new { id = tt.TeamId, name = tt.Team?.Name ?? "" })
                         .ToList();
 
                     <div class="card mb-2">
@@ -236,18 +237,18 @@
                             {
                                 <p class="text-muted small text-center py-2 mb-0">No matches yet.</p>
                             }
-                            <!-- Add Match form -->
-                            @if (poolTeams.Count >= 2)
+                            <!-- Add Match form – all enrolled teams available -->
+                            @if (allTeams.Count >= 2)
                             {
                                 <form asp-action="AddPoolMatch" method="post" class="d-flex gap-1 p-2 border-top align-items-center flex-wrap">
                                     <input type="hidden" name="id" value="@Model.Id" />
                                     <input type="hidden" name="poolId" value="@pool.Id" />
-                                    <select name="homeTeamId" class="form-select form-select-sm" style="min-width:120px">
-                                        @foreach (var t in poolTeams) { <option value="@t.id">@t.name</option> }
+                                    <select name="homeTeamId" class="form-select form-select-sm" style="min-width:130px">
+                                        @foreach (var t in allTeams) { <option value="@t.id">@t.name</option> }
                                     </select>
                                     <span class="small text-muted fw-bold">vs</span>
-                                    <select name="awayTeamId" class="form-select form-select-sm" style="min-width:120px">
-                                        @foreach (var t in poolTeams) { <option value="@t.id">@t.name</option> }
+                                    <select name="awayTeamId" class="form-select form-select-sm" style="min-width:130px">
+                                        @foreach (var t in allTeams) { <option value="@t.id">@t.name</option> }
                                     </select>
                                     <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">
                                         <i class="bi bi-plus me-1"></i>Add Match
