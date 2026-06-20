@@ -618,8 +618,9 @@ public class TournamentsController : Controller
             // Match W/L only recorded when the match is fully complete
             if (match.Status == MatchStatus.Completed)
             {
-                if (homeSets > awaySets) { dict[homeId].MatchesWon++; dict[awayId].MatchesLost++; }
-                else                     { dict[awayId].MatchesWon++; dict[homeId].MatchesLost++; }
+                if (homeSets > awaySets)      { dict[homeId].MatchesWon++; dict[awayId].MatchesLost++; }
+                else if (awaySets > homeSets) { dict[awayId].MatchesWon++; dict[homeId].MatchesLost++; }
+                // equal sets (e.g. 1-1 in a 2-set match) → no match win assigned to either team
             }
         }
 
