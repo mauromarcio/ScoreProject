@@ -76,59 +76,67 @@
             </div>
             <div class="card-body py-2">
                 <form asp-action="UpdateSettings" asp-route-id="@Model.Id" method="post">
+                    @{
+                        var spm  = Model.SetsPerMatch;
+                        var ptw  = Model.PointsToWin;
+                        var pc   = Model.PointsCap;
+                        var qfs  = Model.PlayoffSetsPerMatch;
+                        var sfs  = Model.SemifinalSetsPerMatch;
+                        var fins = Model.FinalSetsPerMatch;
+                    }
                     <div class="row g-2 align-items-end flex-wrap">
                         <div class="col-auto">
                             <label class="form-label small fw-semibold mb-1">Pool Sets</label>
                             <select name="setsPerMatch" class="form-select form-select-sm">
                                 @for (int i = 1; i <= 5; i++)
                                 {
-                                    <option value="@i" @(Model.SetsPerMatch == i ? "selected" : "")>@i set@(i > 1 ? "s" : "")</option>
+                                    <option value="@i" selected="@(spm == i)">@i set@(i > 1 ? "s" : "")</option>
                                 }
                             </select>
                         </div>
                         <div class="col-auto">
                             <label class="form-label small fw-semibold mb-1">Points to Win</label>
                             <select name="pointsToWin" class="form-select form-select-sm">
-                                <option value="11" @(Model.PointsToWin == 11 ? "selected" : "")>11 pts</option>
-                                <option value="15" @(Model.PointsToWin == 15 ? "selected" : "")>15 pts</option>
-                                <option value="21" @(Model.PointsToWin == 21 ? "selected" : "")>21 pts</option>
-                                <option value="25" @(Model.PointsToWin == 25 ? "selected" : "")>25 pts</option>
+                                <option value="11" selected="@(ptw == 11)">11 pts</option>
+                                <option value="15" selected="@(ptw == 15)">15 pts</option>
+                                <option value="21" selected="@(ptw == 21)">21 pts</option>
+                                <option value="25" selected="@(ptw == 25)">25 pts</option>
                             </select>
                         </div>
                         <div class="col-auto">
                             <label class="form-label small fw-semibold mb-1">Point Cap</label>
                             <select name="pointsCap" class="form-select form-select-sm">
-                                <option value="0"  @(Model.PointsCap == 0  ? "selected" : "")>No cap</option>
-                                <option value="13" @(Model.PointsCap == 13 ? "selected" : "")>13 (11-pt)</option>
-                                <option value="17" @(Model.PointsCap == 17 ? "selected" : "")>17 (15-pt)</option>
-                                <option value="23" @(Model.PointsCap == 23 ? "selected" : "")>23</option>
-                                <option value="27" @(Model.PointsCap == 27 ? "selected" : "")>27</option>
-                                <option value="28" @(Model.PointsCap == 28 ? "selected" : "")>28</option>
-                                <option value="30" @(Model.PointsCap == 30 ? "selected" : "")>30</option>
+                                <option value="0"  selected="@(pc == 0)">No cap</option>
+                                <option value="13" selected="@(pc == 13)">13 (11-pt)</option>
+                                <option value="17" selected="@(pc == 17)">17 (15-pt)</option>
+                                <option value="23" selected="@(pc == 23)">23</option>
+                                <option value="27" selected="@(pc == 27)">27</option>
+                                <option value="28" selected="@(pc == 28)">28</option>
+                                <option value="30" selected="@(pc == 30)">30</option>
                             </select>
                         </div>
                         <div class="col-auto">
                             <label class="form-label small fw-semibold mb-1">QF Sets</label>
                             <select name="playoffSetsPerMatch" class="form-select form-select-sm">
-                                <option value="1" @(Model.PlayoffSetsPerMatch == 1 ? "selected" : "")>1 set</option>
-                                <option value="2" @(Model.PlayoffSetsPerMatch == 2 ? "selected" : "")>2 sets</option>
-                                <option value="3" @(Model.PlayoffSetsPerMatch == 3 ? "selected" : "")>Best of 3</option>
+                                <option value="1" selected="@(qfs == 1)">1 set</option>
+                                <option value="2" selected="@(qfs == 2)">2 sets</option>
+                                <option value="3" selected="@(qfs == 3)">Best of 3</option>
                             </select>
                         </div>
                         <div class="col-auto">
                             <label class="form-label small fw-semibold mb-1">SF Sets</label>
                             <select name="semifinalSetsPerMatch" class="form-select form-select-sm">
-                                <option value="1" @(Model.SemifinalSetsPerMatch == 1 ? "selected" : "")>1 set</option>
-                                <option value="2" @(Model.SemifinalSetsPerMatch == 2 ? "selected" : "")>2 sets</option>
-                                <option value="3" @(Model.SemifinalSetsPerMatch == 3 ? "selected" : "")>Best of 3</option>
+                                <option value="1" selected="@(sfs == 1)">1 set</option>
+                                <option value="2" selected="@(sfs == 2)">2 sets</option>
+                                <option value="3" selected="@(sfs == 3)">Best of 3</option>
                             </select>
                         </div>
                         <div class="col-auto">
                             <label class="form-label small fw-semibold mb-1">Final Sets</label>
                             <select name="finalSetsPerMatch" class="form-select form-select-sm">
-                                <option value="1" @(Model.FinalSetsPerMatch == 1 ? "selected" : "")>1 set</option>
-                                <option value="2" @(Model.FinalSetsPerMatch == 2 ? "selected" : "")>2 sets</option>
-                                <option value="3" @(Model.FinalSetsPerMatch == 3 ? "selected" : "")>Best of 3</option>
+                                <option value="1" selected="@(fins == 1)">1 set</option>
+                                <option value="2" selected="@(fins == 2)">2 sets</option>
+                                <option value="3" selected="@(fins == 3)">Best of 3</option>
                             </select>
                         </div>
                         <div class="col-auto">
