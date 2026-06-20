@@ -331,6 +331,38 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.4);
 }
 
+/* ── Touch / tablet support ──────────────────────────────────────────────── */
+/* Prevent the browser from intercepting touch-drag as a page scroll.
+   Touch Punch (loaded in Court.cshtml) maps the resulting touch events
+   to jQuery UI mousedown/mousemove/mouseup so drag-drop works on tablets. */
+.player-badge {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.position-slot {
+    touch-action: none;
+}
+
+/* Larger hit targets on touch screens */
+@media (pointer: coarse) {
+    .player-badge {
+        min-height: 44px;
+        padding: 8px 10px;
+    }
+
+    .position-slot {
+        width: 72px;
+        height: 72px;
+    }
+
+    .score-btn {
+        min-width: 52px;
+        min-height: 52px;
+    }
+}
+
 /* ── Responsive adjustments ─────────────────────────────────────────────── */
 @media (max-width: 992px) {
     .player-roster { width: 150px; }
