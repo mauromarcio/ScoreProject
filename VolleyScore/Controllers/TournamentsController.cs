@@ -67,6 +67,36 @@ public class TournamentsController : Controller
         return RedirectToAction(nameof(Manage), new { id = tournament.Id });
     }
 
+    // ── Update match settings ─────────────────────────────────────────────────
+
+    [HttpPost]
+    public async Task<IActionResult> UpdateSettings(int id,
+        int setsPerMatch, int pointsToWin, int pointsCap,
+        int playoffSetsPerMatch, int semifinalSetsPerMatch, int finalSetsPerMatch)
+    {
+        var tournament = await _context.Tournaments.FindAsync(id);
+        if (tournament == null) return NotFound();
+
+        bool hasSchedule = await _context.TournamentMatches
+            .AnyAsync(tm => tm.TournamentId == id && tm.Phase == TournamentPhase.Pool);
+        if (!hasSchedule)
+        {
+            TempData["Error"] = "Settings can only be updated after the pool schedule has been generated.";
+            return RedirectToAction(nameof(Manage), new { id });
+        }
+
+        tournament.SetsPerMatch          = Math.Clamp(setsPerMatch, 1, 5);
+        tournament.PointsToWin           = Math.Clamp(pointsToWin, 1, 99);
+        tournament.PointsCap             = Math.Clamp(pointsCap, 0, 99);
+        tournament.PlayoffSetsPerMatch   = Math.Clamp(playoffSetsPerMatch, 1, 5);
+        tournament.SemifinalSetsPerMatch = Math.Clamp(semifinalSetsPerMatch, 1, 5);
+        tournament.FinalSetsPerMatch     = Math.Clamp(finalSetsPerMatch, 1, 5);
+
+        await _context.SaveChangesAsync();
+        TempData["Success"] = "Tournament settings updated. New matches will use these values.";
+        return RedirectToAction(nameof(Manage), new { id });
+    }
+
     // ── Manage ────────────────────────────────────────────────────────────────
 
     public async Task<IActionResult> Manage(int id)

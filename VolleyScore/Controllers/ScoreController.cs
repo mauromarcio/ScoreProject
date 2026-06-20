@@ -104,6 +104,47 @@ public class ScoreController : Controller
         return await MutateScore(req, -1);
     }
 
+    // POST: Score/RotateTeam  {matchId, team:"Home"|"Away", direction:"forward"|"back"}
+    [HttpPost]
+    public async Task<IActionResult> RotateTeam([FromBody] RotateRequest req)
+    {
+        var (match, currentSet, error) = await LoadMatchSet(req.MatchId);
+        if (error != null) return error;
+
+        bool forward = req.Direction != "back";
+        int rotMod = match!.IsDoubles ? 2 : 6;
+
+        if (req.Team == "Home")
+        {
+            currentSet!.HomeRotationIndex = forward
+                ? (currentSet.HomeRotationIndex + 1) % rotMod
+                : (currentSet.HomeRotationIndex - 1 + rotMod) % rotMod;
+            await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, forward);
+        }
+        else
+        {
+            currentSet!.AwayRotationIndex = forward
+                ? (currentSet.AwayRotationIndex + 1) % rotMod
+                : (currentSet.AwayRotationIndex - 1 + rotMod) % rotMod;
+            await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, forward);
+        }
+
+        await _context.SaveChangesAsync();
+
+        var updatedMatch = await _context.Matches
+            .Include(m => m.HomeTeam)
+            .Include(m => m.AwayTeam)
+            .Include(m => m.Sets)
+            .FirstOrDefaultAsync(m => m.Id == req.MatchId);
+
+        var activeSet = updatedMatch!.Sets.FirstOrDefault(s => s.SetNumber == updatedMatch.CurrentSetNumber)
+                       ?? updatedMatch.Sets.OrderBy(s => s.SetNumber).Last();
+
+        var result = await BuildResult(updatedMatch, activeSet, false, false);
+        await BroadcastScore(updatedMatch.Id, result);
+        return Ok(result);
+    }
+
     // POST: Score/SetServing  {matchId, team:"Home"|"Away"}
     [HttpPost]
     public async Task<IActionResult> SetServing([FromBody] ScoreRequest req)
@@ -265,7 +306,7 @@ public class ScoreController : Controller
     /// Standard rotation map: 1→6, 2→1, 3→2, 4→3, 5→4, 6→5
     /// Doubles rotation map: 1→2, 2→1
     /// </summary>
-    private async Task RotatePlayers(int matchId, int setNumber, string side, int rotationIndex, bool isDoubles = false)
+    private async Task RotatePlayers(int matchId, int setNumber, string side, int rotationIndex, bool isDoubles = false, bool forward = true)
     {
         var positions = await _context.PlayerPositions
             .Where(pp => pp.MatchId == matchId && pp.SetNumber == setNumber && pp.Side == side)
@@ -287,7 +328,9 @@ public class ScoreController : Controller
                 Side      = pp.Side,
                 Position  = isDoubles
                     ? pp.Position switch { 1 => 2, 2 => 1, _ => pp.Position }
-                    : pp.Position switch { 1 => 6, 2 => 1, 3 => 2, 4 => 3, 5 => 4, 6 => 5, _ => pp.Position }
+                    : forward
+                        ? pp.Position switch { 1 => 6, 2 => 1, 3 => 2, 4 => 3, 5 => 4, 6 => 5, _ => pp.Position }
+                        : pp.Position switch { 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6, 6 => 1, _ => pp.Position }
             });
         }
     }
@@ -394,4 +437,14 @@ public class ScoreRequest
     public int MatchId { get; set; }
     /// <summary>"Home" or "Away"</summary>
     public string Team { get; set; } = string.Empty;
+}
+
+/// <summary>Body for RotateTeam AJAX requests</summary>
+public class RotateRequest
+{
+    public int MatchId { get; set; }
+    /// <summary>"Home" or "Away"</summary>
+    public string Team { get; set; } = string.Empty;
+    /// <summary>"forward" or "back"</summary>
+    public string Direction { get; set; } = "forward";
 }

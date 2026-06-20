@@ -43,7 +43,8 @@
         totalSets: @Model.TotalSets,
         homeScore: @Model.CurrentSet.HomeScore,
         awayScore: @Model.CurrentSet.AwayScore,
-        isDoubles: @Model.Match.IsDoubles.ToString().ToLower()
+        isDoubles: @Model.Match.IsDoubles.ToString().ToLower(),
+        pointsToWin: @Model.Match.PointsToWin
     };
 </script>
 
@@ -148,7 +149,7 @@
         </div>
     </div>
 
-    <!-- ── Switch-sides cue (Doubles only) ──────────────────────────────── -->
+    <!-- ── Switch-sides cue ──────────────────────────────────────────────── -->
     <div id="switchSidesCue" class="switch-sides-cue" style="display:none">
         <i class="bi bi-arrow-left-right me-1"></i>Switch Sides
     </div>
@@ -258,6 +259,34 @@
                     onclick="switchSides()">
                 <i class="bi bi-arrow-left-right me-1"></i> Switch Sides
             </button>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="rotateTeam('@leftSide','back')"
+                        title="Rotate @leftTeam.Name backward">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                <span class="btn btn-outline-secondary btn-sm disabled px-2"
+                      style="font-size:.7rem;pointer-events:none">@(leftTeam.Name.Length > 8 ? leftTeam.Name[..8] + "…" : leftTeam.Name)</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="rotateTeam('@leftSide','forward')"
+                        title="Rotate @leftTeam.Name forward">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="rotateTeam('@rightSide','back')"
+                        title="Rotate @rightTeam.Name backward">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                <span class="btn btn-outline-secondary btn-sm disabled px-2"
+                      style="font-size:.7rem;pointer-events:none">@(rightTeam.Name.Length > 8 ? rightTeam.Name[..8] + "…" : rightTeam.Name)</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="rotateTeam('@rightSide','forward')"
+                        title="Rotate @rightTeam.Name forward">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
             <button id="btnStartMatch" class="btn btn-success toolbar-btn"
                     onclick="startMatch()"
                     style="@(Model.Match.Status == MatchStatus.InProgress || Model.Match.Status == MatchStatus.Completed ? "display:none" : "")">

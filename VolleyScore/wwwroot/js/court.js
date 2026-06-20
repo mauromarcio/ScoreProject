@@ -22,7 +22,14 @@
     var totalSets   = COURT_DATA.totalSets;
 
     var isBusy = false; // prevents double-clicks on score buttons
-    var isDoubles = COURT_DATA.isDoubles === true;
+    var isDoubles   = COURT_DATA.isDoubles === true;
+    var pointsToWin = COURT_DATA.pointsToWin || 25;
+
+    // Divisor for the switch-sides cue: every N total points
+    var switchSidesEvery = pointsToWin === 11 ? 4
+                         : pointsToWin === 15 ? 5
+                         : pointsToWin === 21 ? 7
+                         : 0; // no cue for 25-pt indoor
 
     // ── jQuery UI Drag & Drop ─────────────────────────────────────────────────
     function initDragDrop() {
@@ -245,10 +252,10 @@
         homeSetsWon = result.homeSetsWon;
         awaySetsWon = result.awaySetsWon;
 
-        // Switch-sides cue for Doubles: show when total score is divisible by 15
-        if (isDoubles) {
+        // Switch-sides cue: show when total score hits the interval for the set length
+        if (switchSidesEvery > 0) {
             var total = result.homeScore + result.awayScore;
-            if (total > 0 && total % 15 === 0) {
+            if (total > 0 && total % switchSidesEvery === 0) {
                 showSwitchSidesCue();
             } else {
                 hideSwitchSidesCue();
@@ -365,6 +372,30 @@
         window.location.reload();
     };
 
+    // ── Manual rotation ───────────────────────────────────────────────────────
+    window.rotateTeam = function (side, direction) {
+        $.ajax({
+            url: '/Score/RotateTeam',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ matchId: matchId, team: side, direction: direction }),
+            success: function (result) {
+                if (!result.success) {
+                    showError(result.error || 'Rotation failed.');
+                    return;
+                }
+                var leftIsServing = homeTeamOnLeft ? result.homeIsServing : !result.homeIsServing;
+                if (result.homeCourtPositions && result.awayCourtPositions) {
+                    var leftPos  = homeTeamOnLeft ? result.homeCourtPositions : result.awayCourtPositions;
+                    var rightPos = homeTeamOnLeft ? result.awayCourtPositions : result.homeCourtPositions;
+                    renderCourtPositions('left',  leftPos,   leftIsServing);
+                    renderCourtPositions('right', rightPos, !leftIsServing);
+                }
+            },
+            error: function () { showError('Network error during rotation.'); }
+        });
+    };
+
     // ── Switch sides ──────────────────────────────────────────────────────────
     window.switchSides = function () {
         $.ajax({
@@ -463,10 +494,10 @@
         var initServingLeft = homeTeamOnLeft ? homeIsServing : !homeIsServing;
         updateServingBadge(initServingLeft);
 
-        // Check initial score for switch-sides cue (Doubles)
-        if (isDoubles) {
+        // Check initial score for switch-sides cue
+        if (switchSidesEvery > 0) {
             var initTotal = homeScore + awayScore;
-            if (initTotal > 0 && initTotal % 15 === 0) showSwitchSidesCue();
+            if (initTotal > 0 && initTotal % switchSidesEvery === 0) showSwitchSidesCue();
         }
     });
 

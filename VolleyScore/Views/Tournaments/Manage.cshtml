@@ -52,6 +52,96 @@
         </div>
     </div>
 
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible mb-3" role="alert">
+            <i class="bi bi-check-circle me-1"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (hasSchedule)
+    {
+        <div class="card border-info mb-4">
+            <div class="card-header fw-semibold d-flex align-items-center gap-2" style="color:#0d6efd">
+                <i class="bi bi-sliders"></i> Match Settings
+                <small class="text-muted fw-normal ms-1">— applies to future matches only</small>
+            </div>
+            <div class="card-body py-2">
+                <form asp-action="UpdateSettings" asp-route-id="@Model.Id" method="post">
+                    <div class="row g-2 align-items-end flex-wrap">
+                        <div class="col-auto">
+                            <label class="form-label small fw-semibold mb-1">Pool Sets</label>
+                            <select name="setsPerMatch" class="form-select form-select-sm">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <option value="@i" @(Model.SetsPerMatch == i ? "selected" : "")>@i set@(i > 1 ? "s" : "")</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small fw-semibold mb-1">Points to Win</label>
+                            <select name="pointsToWin" class="form-select form-select-sm">
+                                <option value="11" @(Model.PointsToWin == 11 ? "selected" : "")>11 pts</option>
+                                <option value="15" @(Model.PointsToWin == 15 ? "selected" : "")>15 pts</option>
+                                <option value="21" @(Model.PointsToWin == 21 ? "selected" : "")>21 pts</option>
+                                <option value="25" @(Model.PointsToWin == 25 ? "selected" : "")>25 pts</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small fw-semibold mb-1">Point Cap</label>
+                            <select name="pointsCap" class="form-select form-select-sm">
+                                <option value="0"  @(Model.PointsCap == 0  ? "selected" : "")>No cap</option>
+                                <option value="13" @(Model.PointsCap == 13 ? "selected" : "")>13 (11-pt)</option>
+                                <option value="17" @(Model.PointsCap == 17 ? "selected" : "")>17 (15-pt)</option>
+                                <option value="23" @(Model.PointsCap == 23 ? "selected" : "")>23</option>
+                                <option value="27" @(Model.PointsCap == 27 ? "selected" : "")>27</option>
+                                <option value="28" @(Model.PointsCap == 28 ? "selected" : "")>28</option>
+                                <option value="30" @(Model.PointsCap == 30 ? "selected" : "")>30</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small fw-semibold mb-1">QF Sets</label>
+                            <select name="playoffSetsPerMatch" class="form-select form-select-sm">
+                                <option value="1" @(Model.PlayoffSetsPerMatch == 1 ? "selected" : "")>1 set</option>
+                                <option value="2" @(Model.PlayoffSetsPerMatch == 2 ? "selected" : "")>2 sets</option>
+                                <option value="3" @(Model.PlayoffSetsPerMatch == 3 ? "selected" : "")>Best of 3</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small fw-semibold mb-1">SF Sets</label>
+                            <select name="semifinalSetsPerMatch" class="form-select form-select-sm">
+                                <option value="1" @(Model.SemifinalSetsPerMatch == 1 ? "selected" : "")>1 set</option>
+                                <option value="2" @(Model.SemifinalSetsPerMatch == 2 ? "selected" : "")>2 sets</option>
+                                <option value="3" @(Model.SemifinalSetsPerMatch == 3 ? "selected" : "")>Best of 3</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small fw-semibold mb-1">Final Sets</label>
+                            <select name="finalSetsPerMatch" class="form-select form-select-sm">
+                                <option value="1" @(Model.FinalSetsPerMatch == 1 ? "selected" : "")>1 set</option>
+                                <option value="2" @(Model.FinalSetsPerMatch == 2 ? "selected" : "")>2 sets</option>
+                                <option value="3" @(Model.FinalSetsPerMatch == 3 ? "selected" : "")>Best of 3</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="bi bi-check me-1"></i>Save
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
     <div class="row g-4">
 
         <!-- LEFT: Team enrollment -->
