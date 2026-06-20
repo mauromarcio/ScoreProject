@@ -331,18 +331,23 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.4);
 }
 
-/* ── Touch / tablet support ──────────────────────────────────────────────── */
-/* Prevent the browser from intercepting touch-drag as a page scroll.
-   Touch Punch (loaded in Court.cshtml) maps the resulting touch events
-   to jQuery UI mousedown/mousemove/mouseup so drag-drop works on tablets. */
+/* ── Touch / tablet drag-and-drop support ────────────────────────────────── */
+/* Prevent the browser from stealing the touch gesture for page-scroll while
+   the user is dragging a player badge. The custom touch handler in court.js
+   calls preventDefault() on touchmove so the browser knows to stay out. */
 .player-badge {
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
+    cursor: grab;
 }
 
-.position-slot {
-    touch-action: none;
+/* Drop-target highlight during a touch drag (mirrors .ui-droppable-hover) */
+.position-slot.touch-hover {
+    border-color: #1976d2;
+    background: #e3f2fd;
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.3);
 }
 
 /* Larger hit targets on touch screens */

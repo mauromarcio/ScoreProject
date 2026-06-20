@@ -372,6 +372,124 @@
         window.location.reload();
     };
 
+    // ── Native touch drag-and-drop for tablets / touchscreen laptops ──────────
+    // jQuery UI droppable relies on mouseover/mouseout events which touch events
+    // never fire on the element *underneath* the finger. This handler uses
+    // document.elementFromPoint() on every touchmove to find the real target
+    // and reuses the existing savePosition() callback on touchend.
+    function initTouchDragDrop() {
+        if (!('ontouchstart' in window)) return;
+
+        var drag = null; // active drag state
+
+        document.addEventListener('touchstart', function (e) {
+            var badgeEl = e.target.closest('.player-badge');
+            if (!badgeEl) return;
+            if (e.touches.length !== 1) return;
+
+            var touch  = e.touches[0];
+            var badge  = $(badgeEl);
+            var rect   = badgeEl.getBoundingClientRect();
+
+            // Ghost element follows the finger
+            var ghost = badge.clone()
+                .css({
+                    position:      'fixed',
+                    left:          touch.clientX - (touch.clientX - rect.left),
+                    top:           touch.clientY - (touch.clientY - rect.top),
+                    width:         badge.outerWidth(),
+                    margin:        0,
+                    zIndex:        9999,
+                    opacity:       0.85,
+                    pointerEvents: 'none',
+                    transform:     'scale(1.08)',
+                    boxShadow:     '0 6px 20px rgba(0,0,0,0.28)',
+                    transition:    'none'
+                })
+                .appendTo('body');
+
+            drag = {
+                badge:      badge,
+                ghost:      ghost,
+                side:       badge.data('side'),
+                playerId:   badge.data('player-id'),
+                playerNum:  badge.data('player-number'),
+                playerName: badge.data('player-name'),
+                startX:     touch.clientX - rect.left,
+                startY:     touch.clientY - rect.top
+            };
+
+            badge.css('opacity', 0.35);
+            e.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener('touchmove', function (e) {
+            if (!drag) return;
+            if (e.touches.length !== 1) return;
+            var touch = e.touches[0];
+
+            // Move ghost with finger
+            drag.ghost.css({
+                left: touch.clientX - drag.startX,
+                top:  touch.clientY - drag.startY
+            });
+
+            // Find the element actually under the finger
+            drag.ghost[0].style.display = 'none';
+            var el = document.elementFromPoint(touch.clientX, touch.clientY);
+            drag.ghost[0].style.display = '';
+
+            // Highlight valid drop target
+            document.querySelectorAll('.position-slot').forEach(function (s) {
+                s.classList.remove('touch-hover');
+            });
+            if (el) {
+                var slot = el.closest('.position-slot');
+                if (slot && slot.dataset.side === drag.side) {
+                    slot.classList.add('touch-hover');
+                }
+            }
+
+            e.preventDefault();
+        }, { passive: false });
+
+        document.addEventListener('touchend', function (e) {
+            if (!drag) return;
+            var touch = e.changedTouches[0];
+
+            drag.ghost[0].style.display = 'none';
+            var el = document.elementFromPoint(touch.clientX, touch.clientY);
+            drag.ghost.remove();
+            drag.badge.css('opacity', '');
+            document.querySelectorAll('.position-slot').forEach(function (s) {
+                s.classList.remove('touch-hover');
+            });
+
+            if (el) {
+                var slot = el.closest('.position-slot');
+                if (slot && slot.dataset.side === drag.side) {
+                    var position = parseInt(slot.dataset.position, 10);
+                    savePosition(
+                        drag.playerId, drag.playerNum, drag.playerName,
+                        drag.side, position, $(slot), drag.badge
+                    );
+                }
+            }
+
+            drag = null;
+        });
+
+        document.addEventListener('touchcancel', function () {
+            if (!drag) return;
+            drag.ghost.remove();
+            drag.badge.css('opacity', '');
+            document.querySelectorAll('.position-slot').forEach(function (s) {
+                s.classList.remove('touch-hover');
+            });
+            drag = null;
+        });
+    }
+
     // ── Manual rotation ───────────────────────────────────────────────────────
     window.rotateTeam = function (side, direction) {
         $.ajax({
@@ -488,6 +606,7 @@
     // ── Initialise ────────────────────────────────────────────────────────────
     $(document).ready(function () {
         initDragDrop();
+        initTouchDragDrop();
         initSignalR();
 
         // Set initial serving highlight on position 1
