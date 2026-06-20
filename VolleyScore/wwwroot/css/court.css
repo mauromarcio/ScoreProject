@@ -331,18 +331,25 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.4);
 }
 
-/* ── Touch / tablet drag-and-drop support ────────────────────────────────── */
-/* Prevent the browser from stealing the touch gesture for page-scroll while
-   the user is dragging a player badge. The custom touch handler in court.js
-   calls preventDefault() on touchmove so the browser knows to stay out. */
-.player-badge {
+/* ── Touch / pointer drag-and-drop support ────────────────────────────────── */
+/* touch-action:none prevents the browser from claiming the gesture as a
+   pan/scroll before our pointerdown/touchstart handler can fire.
+   Must be set on the badge AND all its children, because touch-action
+   does not inherit and a child without it will let the browser grab the gesture. */
+.player-badge,
+.player-badge *,
+.position-slot {
     touch-action: none;
+    -ms-touch-action: none;
+}
+
+.player-badge {
     -webkit-user-select: none;
     user-select: none;
     cursor: grab;
 }
 
-/* Drop-target highlight during a touch drag (mirrors .ui-droppable-hover) */
+/* Drop-target highlight during a touch/pointer drag */
 .position-slot.touch-hover {
     border-color: #1976d2;
     background: #e3f2fd;

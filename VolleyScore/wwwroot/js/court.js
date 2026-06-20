@@ -372,32 +372,34 @@
         window.location.reload();
     };
 
-    // ── Native touch drag-and-drop for tablets / touchscreen laptops ──────────
-    // jQuery UI droppable relies on mouseover/mouseout events which touch events
-    // never fire on the element *underneath* the finger. This handler uses
-    // document.elementFromPoint() on every touchmove to find the real target
-    // and reuses the existing savePosition() callback on touchend.
+    // ── Touch / pointer drag-and-drop (tablets + touchscreen laptops) ────────
+    // Windows touchscreen laptops fire Pointer Events (not Touch Events).
+    // iOS/Android fire Touch Events. We detect which API is available and use
+    // the right one. In both cases elementFromPoint() finds the slot under the
+    // finger since the ghost element never participates in hit-testing.
     function initTouchDragDrop() {
-        if (!('ontouchstart' in window)) return;
+        var hasPointer = (typeof PointerEvent !== 'undefined');
+        var hasTouch   = ('ontouchstart' in window);
+        if (!hasPointer && !hasTouch) return;
 
-        var drag = null; // active drag state
+        var drag = null;
 
-        document.addEventListener('touchstart', function (e) {
-            var badgeEl = e.target.closest('.player-badge');
-            if (!badgeEl) return;
-            if (e.touches.length !== 1) return;
+        // ── shared helpers ──────────────────────────────────────────────────
 
-            var touch  = e.touches[0];
-            var badge  = $(badgeEl);
+        function beginDrag(clientX, clientY, target) {
+            var badgeEl = target.closest ? target.closest('.player-badge')
+                                         : $(target).closest('.player-badge')[0];
+            if (!badgeEl) return false;
+
+            var jBadge = $(badgeEl);
             var rect   = badgeEl.getBoundingClientRect();
 
-            // Ghost element follows the finger
-            var ghost = badge.clone()
+            var ghost = jBadge.clone()
                 .css({
                     position:      'fixed',
-                    left:          touch.clientX - (touch.clientX - rect.left),
-                    top:           touch.clientY - (touch.clientY - rect.top),
-                    width:         badge.outerWidth(),
+                    left:          rect.left,
+                    top:           rect.top,
+                    width:         jBadge.outerWidth(),
                     margin:        0,
                     zIndex:        9999,
                     opacity:       0.85,
@@ -409,56 +411,50 @@
                 .appendTo('body');
 
             drag = {
-                badge:      badge,
+                badge:      jBadge,
                 ghost:      ghost,
-                side:       badge.data('side'),
-                playerId:   badge.data('player-id'),
-                playerNum:  badge.data('player-number'),
-                playerName: badge.data('player-name'),
-                startX:     touch.clientX - rect.left,
-                startY:     touch.clientY - rect.top
+                side:       jBadge.data('side'),
+                playerId:   jBadge.data('player-id'),
+                playerNum:  jBadge.data('player-number'),
+                playerName: jBadge.data('player-name'),
+                offsetX:    clientX - rect.left,
+                offsetY:    clientY - rect.top
             };
 
-            badge.css('opacity', 0.35);
-            e.preventDefault();
-        }, { passive: false });
+            jBadge.css('opacity', 0.35);
+            return true;
+        }
 
-        document.addEventListener('touchmove', function (e) {
+        function updateDrag(clientX, clientY) {
             if (!drag) return;
-            if (e.touches.length !== 1) return;
-            var touch = e.touches[0];
 
-            // Move ghost with finger
             drag.ghost.css({
-                left: touch.clientX - drag.startX,
-                top:  touch.clientY - drag.startY
+                left: clientX - drag.offsetX,
+                top:  clientY - drag.offsetY
             });
 
-            // Find the element actually under the finger
+            // Hide ghost so it doesn't block elementFromPoint
             drag.ghost[0].style.display = 'none';
-            var el = document.elementFromPoint(touch.clientX, touch.clientY);
+            var el = document.elementFromPoint(clientX, clientY);
             drag.ghost[0].style.display = '';
 
-            // Highlight valid drop target
             document.querySelectorAll('.position-slot').forEach(function (s) {
                 s.classList.remove('touch-hover');
             });
             if (el) {
-                var slot = el.closest('.position-slot');
+                var slot = el.closest ? el.closest('.position-slot')
+                                      : $(el).closest('.position-slot')[0];
                 if (slot && slot.dataset.side === drag.side) {
                     slot.classList.add('touch-hover');
                 }
             }
+        }
 
-            e.preventDefault();
-        }, { passive: false });
-
-        document.addEventListener('touchend', function (e) {
+        function commitDrag(clientX, clientY) {
             if (!drag) return;
-            var touch = e.changedTouches[0];
 
             drag.ghost[0].style.display = 'none';
-            var el = document.elementFromPoint(touch.clientX, touch.clientY);
+            var el = document.elementFromPoint(clientX, clientY);
             drag.ghost.remove();
             drag.badge.css('opacity', '');
             document.querySelectorAll('.position-slot').forEach(function (s) {
@@ -466,20 +462,18 @@
             });
 
             if (el) {
-                var slot = el.closest('.position-slot');
+                var slot = el.closest ? el.closest('.position-slot')
+                                      : $(el).closest('.position-slot')[0];
                 if (slot && slot.dataset.side === drag.side) {
-                    var position = parseInt(slot.dataset.position, 10);
-                    savePosition(
-                        drag.playerId, drag.playerNum, drag.playerName,
-                        drag.side, position, $(slot), drag.badge
-                    );
+                    var pos = parseInt(slot.dataset.position, 10);
+                    savePosition(drag.playerId, drag.playerNum, drag.playerName,
+                                 drag.side, pos, $(slot), drag.badge);
                 }
             }
-
             drag = null;
-        });
+        }
 
-        document.addEventListener('touchcancel', function () {
+        function abortDrag() {
             if (!drag) return;
             drag.ghost.remove();
             drag.badge.css('opacity', '');
@@ -487,7 +481,58 @@
                 s.classList.remove('touch-hover');
             });
             drag = null;
-        });
+        }
+
+        // ── Pointer Events (Windows touch, Surface, stylus) ─────────────────
+        if (hasPointer) {
+            document.addEventListener('pointerdown', function (e) {
+                if (e.pointerType === 'mouse') return;
+                if (beginDrag(e.clientX, e.clientY, e.target)) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            document.addEventListener('pointermove', function (e) {
+                if (!drag || e.pointerType === 'mouse') return;
+                updateDrag(e.clientX, e.clientY);
+                e.preventDefault();
+            }, { passive: false });
+
+            document.addEventListener('pointerup', function (e) {
+                if (!drag || e.pointerType === 'mouse') return;
+                commitDrag(e.clientX, e.clientY);
+            });
+
+            document.addEventListener('pointercancel', function (e) {
+                if (e.pointerType !== 'mouse') abortDrag();
+            });
+        }
+
+        // ── Touch Events (iOS / Android fallback) ───────────────────────────
+        if (hasTouch && !hasPointer) {
+            document.addEventListener('touchstart', function (e) {
+                if (e.touches.length !== 1) return;
+                var t = e.touches[0];
+                if (beginDrag(t.clientX, t.clientY, e.target)) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchmove', function (e) {
+                if (!drag || e.touches.length !== 1) return;
+                var t = e.touches[0];
+                updateDrag(t.clientX, t.clientY);
+                e.preventDefault();
+            }, { passive: false });
+
+            document.addEventListener('touchend', function (e) {
+                if (!drag) return;
+                var t = e.changedTouches[0];
+                commitDrag(t.clientX, t.clientY);
+            });
+
+            document.addEventListener('touchcancel', abortDrag);
+        }
     }
 
     // ── Manual rotation ───────────────────────────────────────────────────────
