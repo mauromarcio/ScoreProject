@@ -662,6 +662,21 @@ public class TournamentsController : Controller
         return View(tournament);
     }
 
+    // ── Pool Schedule printable report ────────────────────────────────────────
+
+    public async Task<IActionResult> PoolSchedule(int id)
+    {
+        var tournament = await _context.Tournaments
+            .Include(t => t.Pools)
+            .Include(t => t.TournamentMatches).ThenInclude(tm => tm.Match).ThenInclude(m => m!.Sets)
+            .Include(t => t.TournamentMatches).ThenInclude(tm => tm.HomeTeam)
+            .Include(t => t.TournamentMatches).ThenInclude(tm => tm.AwayTeam)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (tournament == null) return NotFound();
+        return View(tournament);
+    }
+
     // ── Round-robin schedule generator ───────────────────────────────────────
 
     /// <summary>Circle method – generates all matchups for a group of teams.</summary>

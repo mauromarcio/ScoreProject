@@ -48,6 +48,12 @@
             <a asp-action="Report" asp-route-id="@Model.Id" class="btn btn-outline-info btn-sm">
                 <i class="bi bi-bar-chart me-1"></i>Report
             </a>
+            @if (hasSchedule)
+            {
+                <a asp-action="PoolSchedule" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-calendar3 me-1"></i>Pool Schedule
+                </a>
+            }
             <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-inline"
                   onsubmit="return confirm('Delete tournament \'@Model.Name\'? This will remove all related data and cannot be undone.')">
                 <button type="submit" class="btn btn-danger btn-sm">
