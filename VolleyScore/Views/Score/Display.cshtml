@@ -9,6 +9,10 @@
 
 @section Styles {
 <style>
+    :root {
+        --score-vw: 22;
+    }
+
     /* Full-screen dark scoreboard */
     body.display-screen {
         background: #0d0d0d;
@@ -62,14 +66,15 @@
     }
 
     .display-team-name {
-        font-size: clamp(2rem, 5vw, 4rem);
+        font-size: clamp(2rem, calc(var(--score-vw) * 0.23vw), 5rem);
         font-weight: 900;
         color: #ffffff;
         text-align: center;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        text-shadow: 0 0 24px rgba(255,255,255,0.55), 0 2px 8px rgba(0,0,0,0.4);
         line-height: 1.1;
         padding: 0 20px;
         word-break: break-word;
+        letter-spacing: 0.03em;
     }
 
     /* Set dots */
@@ -95,13 +100,14 @@
 
     /* Score number */
     .display-score-number {
-        font-size: clamp(8rem, 22vw, 18rem);
+        font-size: clamp(8rem, calc(var(--score-vw) * 1vw), 22rem);
         font-weight: 900;
         color: #f5c542;
         font-family: 'Courier New', Courier, monospace;
         line-height: 0.9;
         text-shadow:
-            0 0 40px rgba(245, 197, 66, 0.4),
+            0 0 40px rgba(245, 197, 66, 0.5),
+            0 0 80px rgba(245, 197, 66, 0.2),
             0 4px 20px rgba(0,0,0,0.8);
         transition: transform 0.15s ease;
         min-width: 1ch;
@@ -125,7 +131,7 @@
     }
 
     .display-colon {
-        font-size: clamp(5rem, 14vw, 12rem);
+        font-size: clamp(5rem, calc(var(--score-vw) * 0.64vw), 14rem);
         font-weight: 900;
         color: #444;
         line-height: 1;
@@ -198,6 +204,44 @@
 
     .conn-dot.connected { background: #4caf50; }
     .conn-dot.disconnected { background: #f44336; }
+
+    /* Font-size +/- controls */
+    .font-size-controls {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        z-index: 200;
+    }
+
+    .font-size-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        color: #ffffff;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        transition: background 0.15s, border-color 0.15s;
+    }
+
+    .font-size-btn:hover,
+    .font-size-btn:active {
+        background: rgba(255, 255, 255, 0.28);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
 </style>
 }
 
@@ -260,6 +304,12 @@
 
 </div>
 
+<!-- Font-size resize controls (right side) -->
+<div class="font-size-controls">
+    <button class="font-size-btn" onclick="adjustScoreSize(2)" title="Bigger">+</button>
+    <button class="font-size-btn" onclick="adjustScoreSize(-2)" title="Smaller">−</button>
+</div>
+
 <!-- Real-time connection status dot -->
 <div class="connection-status">
     <div class="conn-dot" id="connDot"></div>
@@ -267,6 +317,28 @@
 </div>
 
 @section Scripts {
+<script>
+    // Font size control for the score display
+    var _scoreVw = 22;
+
+    function adjustScoreSize(delta) {
+        _scoreVw = Math.max(10, Math.min(45, _scoreVw + delta));
+        applyScoreSize();
+    }
+
+    function applyScoreSize() {
+        document.documentElement.style.setProperty('--score-vw', _scoreVw);
+        try { sessionStorage.setItem('displayScoreVw', _scoreVw); } catch(e) {}
+    }
+
+    (function initScoreSize() {
+        try {
+            var saved = sessionStorage.getItem('displayScoreVw');
+            if (saved) { _scoreVw = parseInt(saved, 10) || 22; }
+        } catch(e) {}
+        applyScoreSize();
+    })();
+</script>
 <script>
     // Pass server-rendered initial state to the display JS
     var DISPLAY_DATA = {

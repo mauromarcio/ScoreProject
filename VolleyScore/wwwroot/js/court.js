@@ -576,6 +576,25 @@
         });
     };
 
+    // ── Switch which team is serving ──────────────────────────────────────────
+    window.switchServing = function () {
+        var newServingTeam = homeIsServing ? 'Away' : 'Home';
+        $.ajax({
+            url: '/Score/SetServing',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ matchId: matchId, team: newServingTeam }),
+            success: function (result) {
+                if (!result.success) {
+                    showError(result.error || 'Could not switch serve.');
+                    return;
+                }
+                applyScoreUpdate(result);
+            },
+            error: function () { showError('Network error switching serve.'); }
+        });
+    };
+
     // ── Start match ───────────────────────────────────────────────────────────
     window.startMatch = function () {
         $.ajax({

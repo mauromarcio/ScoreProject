@@ -267,13 +267,11 @@
 }
 
 /* ── Court position grid layout ─────────────────────────────────────────── */
-/*  Standard volleyball layout (from team's perspective, left half):
-    pos4(FL) | pos3(FC)   ← front row (near net = right side of left half)
+/*  Standard volleyball layout – left half has net on the RIGHT:
+    col1 = back (away from net), col2 = front (near net)
+    pos4(FL) | pos3(FC)   ← front row (col2)
     pos5(BL) | pos6(BC)
-    pos1(BR) | pos2(FR)   ← back row (server at pos1)
-
-    On screen for the LEFT half (home team on left):
-    net is on the RIGHT → front row slots are in the RIGHT column
+    pos1(BR) | pos2(FR)   ← pos1 = server at back-right
 */
 
 /* Left court (home, net on right): grid [row][col] */
@@ -291,6 +289,12 @@
 .court-half.right-half .position-slot[data-position="6"] { grid-row: 2; grid-column: 2; }
 .court-half.right-half .position-slot[data-position="4"] { grid-row: 3; grid-column: 1; }
 .court-half.right-half .position-slot[data-position="5"] { grid-row: 3; grid-column: 2; }
+
+/* ── Doubles layout override: both players in the back (away from net) ──── */
+/* Left half: back column is col1. Move pos2 next to pos1 in the back column. */
+.doubles-mode .court-half.left-half .position-slot[data-position="2"] { grid-row: 2; grid-column: 1; }
+/* Right half: back column is col2. Move pos2 next to pos1 in the back column. */
+.doubles-mode .court-half.right-half .position-slot[data-position="2"] { grid-row: 2; grid-column: 2; }
 
 /* ── Action toolbar ─────────────────────────────────────────────────────── */
 .court-toolbar {
