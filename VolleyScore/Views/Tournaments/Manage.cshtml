@@ -277,7 +277,7 @@
 
             @if (hasSchedule || hasPools)
             {
-                @{ int matchCounter = 0; }
+                int matchCounter = 0;
                 @foreach (var pool in Model.Pools.OrderBy(p => p.SortOrder))
                 {
                     var poolMatches = Model.TournamentMatches
