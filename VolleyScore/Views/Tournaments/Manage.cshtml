@@ -276,6 +276,14 @@
                                 <i class="bi bi-calendar-week me-1"></i>Generate Schedule
                             </button>
                         </form>
+                        @if (hasSchedule)
+                        {
+                            <form asp-action="AssignRefs" asp-route-id="@Model.Id" method="post" class="mt-1">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                                    <i class="bi bi-whistle me-1"></i>Assign Ref
+                                </button>
+                            </form>
+                        }
                     }
                 </div>
             </div>
@@ -307,10 +315,12 @@
                             {
                                 <table class="table table-sm table-hover mb-0">
                                     <tbody class="sortable-match-list" data-pool-id="@pool.Id">
-                                        @foreach (var tm in poolMatches)
+                                        @for (int pmi = 0; pmi < poolMatches.Count; pmi++)
                                         {
+                                            var tm = poolMatches[pmi];
                                             var match = tm.Match;
                                             bool done = match?.Status == MatchStatus.Completed;
+                                            var refM = (tm.RefereeTeamId.HasValue && pmi + 2 < poolMatches.Count) ? poolMatches[pmi + 2] : null;
                                             <tr class="match-row @(done ? "table-success" : "")" data-match-id="@tm.Id">
                                                 <td style="width:20px;cursor:grab" class="text-muted match-drag-handle">
                                                     <i class="bi bi-grip-vertical"></i>
@@ -320,11 +330,15 @@
                                                 <td class="small text-muted">vs</td>
                                                 <td class="small">@tm.AwayTeam?.Name</td>
                                                 <td class="small text-muted" style="white-space:nowrap">
-                                                    @if (tm.RefereeTeam != null)
+                                                    @if (refM != null)
                                                     {
-                                                        <i class="bi bi-whistle me-1" title="Referee"></i>@tm.RefereeTeam.Name
+                                                        <i class="bi bi-whistle me-1" title="Referee"></i>
+                                                        <span>@refM.HomeTeam?.Name &amp; @refM.AwayTeam?.Name</span>
                                                     }
-                                                    else { <span>–</span> }
+                                                    else
+                                                    {
+                                                        <span>–</span>
+                                                    }
                                                 </td>
                                                 <td class="small">
                                                     @if (done && match != null) { int h = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId); int a = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId); <strong>@h–@a</strong> }

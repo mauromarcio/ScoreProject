@@ -412,6 +412,34 @@ public class TournamentsController : Controller
         return RedirectToAction("Court", "Matches", new { id = match.Id });
     }
 
+    // ── Assign referee teams to pool matches ─────────────────────────────────
+
+    /// <summary>Re-applies N+2 referee rotation to all pool matches (match i refs = teams from match i+2).</summary>
+    [HttpPost]
+    public async Task<IActionResult> AssignRefs(int id)
+    {
+        var tournament = await _context.Tournaments
+            .Include(t => t.Pools)
+            .Include(t => t.TournamentMatches)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (tournament == null) return NotFound();
+
+        foreach (var pool in tournament.Pools.OrderBy(p => p.SortOrder))
+        {
+            var poolMatches = tournament.TournamentMatches
+                .Where(tm => tm.Phase == TournamentPhase.Pool && tm.PoolId == pool.Id)
+                .OrderBy(tm => tm.SortOrder)
+                .ToList();
+
+            for (int i = 0; i < poolMatches.Count; i++)
+                poolMatches[i].RefereeTeamId = (i + 2 < poolMatches.Count) ? poolMatches[i + 2].HomeTeamId : null;
+        }
+
+        await _context.SaveChangesAsync();
+        TempData["Success"] = "Referee assignments updated (N+2 rotation).";
+        return RedirectToAction(nameof(Manage), new { id });
+    }
+
     // ── Generate 3rd Place + Final matches ───────────────────────────────────
 
     /// <summary>Creates Match entities for the 3rd Place and Final once semi-finals are done.</summary>
