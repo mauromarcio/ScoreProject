@@ -67,11 +67,23 @@ public class Tournament
 
     [Range(1, 5)]
     [Display(Name = "Semi-final Sets")]
-    public int SemifinalSetsPerMatch { get; set; } = 3;
+    public int SemifinalSetsPerMatch { get; set; } = 1;
+
+    [Range(1, 99)]
+    public int SemifinalPointsToWin { get; set; } = 21;
+
+    [Range(0, 99)]
+    public int SemifinalPointsCap { get; set; } = 0;
 
     [Range(1, 5)]
     [Display(Name = "Final Sets")]
-    public int FinalSetsPerMatch { get; set; } = 3;
+    public int FinalSetsPerMatch { get; set; } = 1;
+
+    [Range(1, 99)]
+    public int FinalPointsToWin { get; set; } = 21;
+
+    [Range(0, 99)]
+    public int FinalPointsCap { get; set; } = 0;
 
     // Navigation
     public ICollection<TournamentTeam> TournamentTeams { get; set; } = new List<TournamentTeam>();

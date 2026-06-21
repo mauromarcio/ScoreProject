@@ -12,6 +12,10 @@
     bool isDoubles = Model.TournamentType == TournamentType.Doubles;
     var crossPoolMatches = Model.TournamentMatches.Where(tm => tm.Phase == TournamentPhase.Pool && tm.PoolId == null).ToList();
     int matchCounter = 0;
+    string sfPreset  = $"{Model.SemifinalSetsPerMatch}|{Model.SemifinalPointsToWin}|{Model.SemifinalPointsCap}";
+    string finPreset = $"{Model.FinalSetsPerMatch}|{Model.FinalPointsToWin}|{Model.FinalPointsCap}";
+    bool hasFinalOrThird  = Model.TournamentMatches.Any(tm => tm.Phase == TournamentPhase.Final || tm.Phase == TournamentPhase.ThirdPlace);
+    bool finalsNotStarted = Model.TournamentMatches.Any(tm => (tm.Phase == TournamentPhase.Final || tm.Phase == TournamentPhase.ThirdPlace) && tm.Match == null);
 }
 
 @section Styles {
@@ -82,8 +86,6 @@
                         var ptw  = Model.PointsToWin;
                         var pc   = Model.PointsCap;
                         var qfs  = Model.PlayoffSetsPerMatch;
-                        var sfs  = Model.SemifinalSetsPerMatch;
-                        var fins = Model.FinalSetsPerMatch;
                     }
                     <div class="row g-2 align-items-end flex-wrap">
                         <div class="col-auto">
@@ -125,19 +127,25 @@
                             </select>
                         </div>
                         <div class="col-auto">
-                            <label class="form-label small fw-semibold mb-1">SF Sets</label>
-                            <select name="semifinalSetsPerMatch" class="form-select form-select-sm">
-                                <option value="1" selected="@(sfs == 1)">1 set</option>
-                                <option value="2" selected="@(sfs == 2)">2 sets</option>
-                                <option value="3" selected="@(sfs == 3)">Best of 3</option>
+                            <label class="form-label small fw-semibold mb-1">SF Format</label>
+                            <select name="semifinalPreset" class="form-select form-select-sm">
+                                <option value="1|21|0"  selected="@(sfPreset == "1|21|0")">1 Set – 21 pts</option>
+                                <option value="3|11|13" selected="@(sfPreset == "3|11|13")">Best of 3 – 11 pts (cap 13)</option>
+                                <option value="1|25|0"  selected="@(sfPreset == "1|25|0")">1 Set – 25 pts (no cap)</option>
+                                <option value="1|25|27" selected="@(sfPreset == "1|25|27")">1 Set – 25 pts (cap 27)</option>
+                                <option value="1|15|0"  selected="@(sfPreset == "1|15|0")">1 Set – 15 pts</option>
+                                <option value="3|15|17" selected="@(sfPreset == "3|15|17")">Best of 3 – 15 pts (cap 17)</option>
                             </select>
                         </div>
                         <div class="col-auto">
-                            <label class="form-label small fw-semibold mb-1">Final Sets</label>
-                            <select name="finalSetsPerMatch" class="form-select form-select-sm">
-                                <option value="1" selected="@(fins == 1)">1 set</option>
-                                <option value="2" selected="@(fins == 2)">2 sets</option>
-                                <option value="3" selected="@(fins == 3)">Best of 3</option>
+                            <label class="form-label small fw-semibold mb-1">Final Format</label>
+                            <select name="finalPreset" class="form-select form-select-sm">
+                                <option value="1|21|0"  selected="@(finPreset == "1|21|0")">1 Set – 21 pts</option>
+                                <option value="3|11|13" selected="@(finPreset == "3|11|13")">Best of 3 – 11 pts (cap 13)</option>
+                                <option value="1|25|0"  selected="@(finPreset == "1|25|0")">1 Set – 25 pts (no cap)</option>
+                                <option value="1|25|27" selected="@(finPreset == "1|25|27")">1 Set – 25 pts (cap 27)</option>
+                                <option value="1|15|0"  selected="@(finPreset == "1|15|0")">1 Set – 15 pts</option>
+                                <option value="3|15|17" selected="@(finPreset == "3|15|17")">Best of 3 – 15 pts (cap 17)</option>
                             </select>
                         </div>
                         <div class="col-auto">
@@ -414,6 +422,16 @@
 
             @if (hasKnockouts)
             {
+                @if (hasFinalOrThird && finalsNotStarted)
+                {
+                    <form asp-action="GenerateFinals" asp-route-id="@Model.Id" method="post" class="mb-2">
+                        <button type="submit" class="btn btn-success btn-sm w-100"
+                                onclick="return confirm('Create 3rd Place and Final matches now?')">
+                            <i class="bi bi-trophy-fill me-1"></i>Generate 3rd Place &amp; Final
+                        </button>
+                    </form>
+                }
+
                 <!-- Knockout bracket -->
                 <div class="card">
                     <div class="card-header fw-semibold">

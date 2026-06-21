@@ -226,7 +226,27 @@ static async Task ApplySchemaUpdates(VolleyScoreContext db)
     await db.Database.ExecuteSqlRawAsync(@"
         IF NOT EXISTS (SELECT 1 FROM sys.columns
                        WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'FinalSetsPerMatch')
-            ALTER TABLE Tournaments ADD FinalSetsPerMatch INT NOT NULL DEFAULT 3;");
+            ALTER TABLE Tournaments ADD FinalSetsPerMatch INT NOT NULL DEFAULT 1;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'SemifinalPointsToWin')
+            ALTER TABLE Tournaments ADD SemifinalPointsToWin INT NOT NULL DEFAULT 21;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'SemifinalPointsCap')
+            ALTER TABLE Tournaments ADD SemifinalPointsCap INT NOT NULL DEFAULT 0;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'FinalPointsToWin')
+            ALTER TABLE Tournaments ADD FinalPointsToWin INT NOT NULL DEFAULT 21;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'FinalPointsCap')
+            ALTER TABLE Tournaments ADD FinalPointsCap INT NOT NULL DEFAULT 0;");
 }
 
 // ── Middleware Pipeline ───────────────────────────────────────────────────────

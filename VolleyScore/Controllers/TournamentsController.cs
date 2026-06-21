@@ -72,7 +72,7 @@ public class TournamentsController : Controller
     [HttpPost]
     public async Task<IActionResult> UpdateSettings(int id,
         int setsPerMatch, int pointsToWin, int pointsCap,
-        int playoffSetsPerMatch, int semifinalSetsPerMatch, int finalSetsPerMatch)
+        int playoffSetsPerMatch, string? semifinalPreset, string? finalPreset)
     {
         var tournament = await _context.Tournaments.FindAsync(id);
         if (tournament == null) return NotFound();
@@ -85,16 +85,38 @@ public class TournamentsController : Controller
             return RedirectToAction(nameof(Manage), new { id });
         }
 
-        tournament.SetsPerMatch          = Math.Clamp(setsPerMatch, 1, 5);
-        tournament.PointsToWin           = Math.Clamp(pointsToWin, 1, 99);
-        tournament.PointsCap             = Math.Clamp(pointsCap, 0, 99);
-        tournament.PlayoffSetsPerMatch   = Math.Clamp(playoffSetsPerMatch, 1, 5);
-        tournament.SemifinalSetsPerMatch = Math.Clamp(semifinalSetsPerMatch, 1, 5);
-        tournament.FinalSetsPerMatch     = Math.Clamp(finalSetsPerMatch, 1, 5);
+        tournament.SetsPerMatch        = Math.Clamp(setsPerMatch, 1, 5);
+        tournament.PointsToWin         = Math.Clamp(pointsToWin, 1, 99);
+        tournament.PointsCap           = Math.Clamp(pointsCap, 0, 99);
+        tournament.PlayoffSetsPerMatch = Math.Clamp(playoffSetsPerMatch, 1, 5);
+
+        var (sfSets, sfPtw, sfCap) = ParsePhasePreset(semifinalPreset);
+        tournament.SemifinalSetsPerMatch = Math.Clamp(sfSets, 1, 5);
+        tournament.SemifinalPointsToWin  = Math.Clamp(sfPtw, 1, 99);
+        tournament.SemifinalPointsCap    = Math.Clamp(sfCap, 0, 99);
+
+        var (finSets, finPtw, finCap) = ParsePhasePreset(finalPreset);
+        tournament.FinalSetsPerMatch  = Math.Clamp(finSets, 1, 5);
+        tournament.FinalPointsToWin   = Math.Clamp(finPtw, 1, 99);
+        tournament.FinalPointsCap     = Math.Clamp(finCap, 0, 99);
 
         await _context.SaveChangesAsync();
         TempData["Success"] = "Tournament settings updated. New matches will use these values.";
         return RedirectToAction(nameof(Manage), new { id });
+    }
+
+    private static (int sets, int ptw, int cap) ParsePhasePreset(string? preset)
+    {
+        if (preset != null)
+        {
+            var p = preset.Split('|');
+            if (p.Length == 3 &&
+                int.TryParse(p[0], out int s) &&
+                int.TryParse(p[1], out int w) &&
+                int.TryParse(p[2], out int c))
+                return (s, w, c);
+        }
+        return (1, 21, 0); // fallback default
     }
 
     // ── Manage ────────────────────────────────────────────────────────────────
@@ -372,7 +394,63 @@ public class TournamentsController : Controller
 
         if (tournament == null || tm == null) return NotFound();
 
-        // Resolve teams for knockout placeholders
+        var match = await CreateMatchForTournamentMatch(tournament, tm);
+        if (match == null)
+        {
+            TempData["Error"] = "Source matches have not completed yet — cannot start this match.";
+            return RedirectToAction(nameof(Manage), new { id });
+        }
+
+        return RedirectToAction("Court", "Matches", new { id = match.Id });
+    }
+
+    // ── Generate 3rd Place + Final matches ───────────────────────────────────
+
+    /// <summary>Creates Match entities for the 3rd Place and Final once semi-finals are done.</summary>
+    [HttpPost]
+    public async Task<IActionResult> GenerateFinals(int id)
+    {
+        var tournament = await _context.Tournaments.FindAsync(id);
+        if (tournament == null) return NotFound();
+
+        var finalMatches = await _context.TournamentMatches
+            .Where(tm => tm.TournamentId == id &&
+                   (tm.Phase == TournamentPhase.Final || tm.Phase == TournamentPhase.ThirdPlace))
+            .ToListAsync();
+
+        if (!finalMatches.Any())
+        {
+            TempData["Error"] = "No Final or 3rd Place entries found. Generate knockouts first.";
+            return RedirectToAction(nameof(Manage), new { id });
+        }
+
+        int created = 0;
+        foreach (var tm in finalMatches)
+        {
+            if (tm.MatchId != null) continue; // already started
+            var match = await CreateMatchForTournamentMatch(tournament, tm);
+            if (match == null)
+            {
+                TempData["Error"] = $"Cannot create '{tm.Label}': the source semi-final has not completed yet.";
+                return RedirectToAction(nameof(Manage), new { id });
+            }
+            created++;
+        }
+
+        TempData["Success"] = created > 0
+            ? $"{created} match(es) created — 3rd Place & Final are ready."
+            : "All finals matches were already started.";
+        return RedirectToAction(nameof(Manage), new { id });
+    }
+
+    // ── Shared match-creation helper ─────────────────────────────────────────
+
+    /// <summary>
+    /// Resolves teams (from source matches if TBD), creates the Match + first GameSet,
+    /// and links the TournamentMatch. Returns null if teams cannot yet be determined.
+    /// </summary>
+    private async Task<Match?> CreateMatchForTournamentMatch(Tournament tournament, TournamentMatch tm)
+    {
         int? homeTeamId = tm.HomeTeamId;
         int? awayTeamId = tm.AwayTeamId;
 
@@ -381,59 +459,61 @@ public class TournamentsController : Controller
         if (awayTeamId == null && tm.AwaySourceMatchId.HasValue)
             awayTeamId = await ResolveTeamFromSource(tm.AwaySourceMatchId.Value, tm.AwayFromWinner);
 
-        if (homeTeamId == null || awayTeamId == null)
-        {
-            TempData["Error"] = "Source matches have not completed yet — cannot start this match.";
-            return RedirectToAction(nameof(Manage), new { id });
-        }
+        if (homeTeamId == null || awayTeamId == null) return null;
 
-        // Pick set count based on phase
         int sets = tm.Phase switch
         {
-            TournamentPhase.QuarterFinal => tournament.PlayoffSetsPerMatch,
-            TournamentPhase.SemiFinal    => tournament.SemifinalSetsPerMatch,
-            TournamentPhase.ThirdPlace   => tournament.SemifinalSetsPerMatch,
-            TournamentPhase.Final        => tournament.FinalSetsPerMatch,
-            _                            => tournament.SetsPerMatch
+            TournamentPhase.QuarterFinal                        => tournament.PlayoffSetsPerMatch,
+            TournamentPhase.SemiFinal or TournamentPhase.ThirdPlace => tournament.SemifinalSetsPerMatch,
+            TournamentPhase.Final                               => tournament.FinalSetsPerMatch,
+            _                                                   => tournament.SetsPerMatch
+        };
+        int ptw = tm.Phase switch
+        {
+            TournamentPhase.SemiFinal or TournamentPhase.ThirdPlace => tournament.SemifinalPointsToWin,
+            TournamentPhase.Final                               => tournament.FinalPointsToWin,
+            _                                                   => tournament.PointsToWin
+        };
+        int cap = tm.Phase switch
+        {
+            TournamentPhase.SemiFinal or TournamentPhase.ThirdPlace => tournament.SemifinalPointsCap,
+            TournamentPhase.Final                               => tournament.FinalPointsCap,
+            _                                                   => tournament.PointsCap
         };
 
-        // Create the Match entity
         var match = new Match
         {
             MatchReference = tm.Label,
-            HomeTeamId = homeTeamId.Value,
-            AwayTeamId = awayTeamId.Value,
-            TotalSets = sets,
-            InitialScore = tournament.InitialScore,
-            Status = MatchStatus.Setup,
+            HomeTeamId     = homeTeamId.Value,
+            AwayTeamId     = awayTeamId.Value,
+            TotalSets      = sets,
+            InitialScore   = tournament.InitialScore,
+            Status         = MatchStatus.Setup,
             CurrentSetNumber = 1,
             HomeTeamOnLeft = true,
-            ServingTeamId = homeTeamId.Value,
-            IsDoubles = tournament.TournamentType == TournamentType.Doubles,
-            PointsToWin = tournament.PointsToWin,
-            PointsCap = tournament.PointsCap
+            ServingTeamId  = homeTeamId.Value,
+            IsDoubles      = tournament.TournamentType == TournamentType.Doubles,
+            PointsToWin    = ptw,
+            PointsCap      = cap
         };
         _context.Matches.Add(match);
         await _context.SaveChangesAsync();
 
-        // First set with handicap
         _context.GameSets.Add(new GameSet
         {
-            MatchId = match.Id,
-            SetNumber = 1,
+            MatchId      = match.Id,
+            SetNumber    = 1,
             HomeIsServing = true,
-            HomeScore = tournament.InitialScore,
-            AwayScore = tournament.InitialScore
+            HomeScore    = tournament.InitialScore,
+            AwayScore    = tournament.InitialScore
         });
 
-        // Link TournamentMatch → Match; update team IDs for knockout placeholders
-        tm.MatchId = match.Id;
+        tm.MatchId    = match.Id;
         tm.HomeTeamId = homeTeamId.Value;
         tm.AwayTeamId = awayTeamId.Value;
-
         await _context.SaveChangesAsync();
 
-        return RedirectToAction("Court", "Matches", new { id = match.Id });
+        return match;
     }
 
     // ── Knockout generation ───────────────────────────────────────────────────
