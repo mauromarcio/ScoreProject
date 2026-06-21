@@ -336,9 +336,10 @@ public class TournamentsController : Controller
                 _context.TournamentMatches.Add(tm);
             }
 
-            // Referee rotation: match N is worked by home team of match N+2
-            for (int i = 0; i + 2 < poolMatchList.Count; i++)
-                poolMatchList[i].RefereeTeamId = poolMatchList[i + 2].HomeTeamId;
+            // Referee rotation: match N is reffed by teams of match N+2 (wraps for last 2)
+            if (poolMatchList.Count >= 3)
+                for (int i = 0; i < poolMatchList.Count; i++)
+                    poolMatchList[i].RefereeTeamId = poolMatchList[(i + 2) % poolMatchList.Count].HomeTeamId;
         }
 
         // Cross-pool matches for Doubles tournaments
@@ -432,7 +433,9 @@ public class TournamentsController : Controller
                 .ToList();
 
             for (int i = 0; i < poolMatches.Count; i++)
-                poolMatches[i].RefereeTeamId = (i + 2 < poolMatches.Count) ? poolMatches[i + 2].HomeTeamId : null;
+                poolMatches[i].RefereeTeamId = poolMatches.Count >= 3
+                    ? poolMatches[(i + 2) % poolMatches.Count].HomeTeamId
+                    : null;
         }
 
         await _context.SaveChangesAsync();
