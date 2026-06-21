@@ -11,6 +11,7 @@
 <style>
     :root {
         --score-vw: 22;
+        --name-vw: 5;
     }
 
     /* Full-screen dark scoreboard */
@@ -66,7 +67,7 @@
     }
 
     .display-team-name {
-        font-size: clamp(2rem, calc(var(--score-vw) * 0.23vw), 5rem);
+        font-size: clamp(1.5rem, calc(var(--name-vw) * 1vw), 7rem);
         font-weight: 900;
         color: #ffffff;
         text-align: center;
@@ -279,8 +280,7 @@
 
         <!-- Right team (Away) -->
         <div class="display-team" id="displayAwayTeam">
-            <div class="display-serving @(!Model.HomeIsServing ? "" : "hidden")" id="displayAwayServing">SERVING</div>
-            <div class="display-score-number" id="displayAwayScore">@Model.AwayScore</div>
+            <div class="display-team-name" id="displayAwayTeamName">@Model.AwayTeamName</div>
             <div class="display-set-dots" id="displayAwayDots">
                 @for (int i = 0; i < (Model.TotalSets / 2 + 1); i++)
                 {
@@ -288,7 +288,8 @@
                          data-index="@i"></div>
                 }
             </div>
-            <div class="display-team-name" id="displayAwayTeamName">@Model.AwayTeamName</div>
+            <div class="display-score-number" id="displayAwayScore">@Model.AwayScore</div>
+            <div class="display-serving @(!Model.HomeIsServing ? "" : "hidden")" id="displayAwayServing">SERVING</div>
         </div>
     </div>
 
@@ -327,7 +328,10 @@
     }
 
     function applyScoreSize() {
+        // name scales INVERSELY: bigger score → smaller name (110 = 22 × 5, the default product)
+        var nameVw = parseFloat((110 / _scoreVw).toFixed(1));
         document.documentElement.style.setProperty('--score-vw', _scoreVw);
+        document.documentElement.style.setProperty('--name-vw', nameVw);
         try { sessionStorage.setItem('displayScoreVw', _scoreVw); } catch(e) {}
     }
 

@@ -277,6 +277,7 @@
 
             @if (hasSchedule || hasPools)
             {
+                @{ int matchCounter = 0; }
                 @foreach (var pool in Model.Pools.OrderBy(p => p.SortOrder))
                 {
                     var poolMatches = Model.TournamentMatches
@@ -302,11 +303,12 @@
                                         {
                                             var match = tm.Match;
                                             bool done = match?.Status == MatchStatus.Completed;
+                                            matchCounter++;
                                             <tr class="match-row @(done ? "table-success" : "")" data-match-id="@tm.Id">
                                                 <td style="width:20px;cursor:grab" class="text-muted match-drag-handle">
                                                     <i class="bi bi-grip-vertical"></i>
                                                 </td>
-                                                <td class="small text-muted">@tm.Label</td>
+                                                <td class="small fw-semibold text-muted">M@matchCounter</td>
                                                 <td class="small">@tm.HomeTeam?.Name</td>
                                                 <td class="small text-muted">vs</td>
                                                 <td class="small">@tm.AwayTeam?.Name</td>
@@ -374,8 +376,9 @@
                                     {
                                         var match = tm.Match;
                                         bool done = match?.Status == MatchStatus.Completed;
+                                        matchCounter++;
                                         <tr class="@(done ? "table-success" : "")">
-                                            <td class="small text-muted">@tm.Label</td>
+                                            <td class="small fw-semibold text-muted">M@matchCounter</td>
                                             <td class="small">@tm.HomeTeam?.Name</td>
                                             <td class="small">@tm.AwayTeam?.Name</td>
                                             <td class="small">
