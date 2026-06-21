@@ -319,6 +319,13 @@
                                                 <td class="small">@tm.HomeTeam?.Name</td>
                                                 <td class="small text-muted">vs</td>
                                                 <td class="small">@tm.AwayTeam?.Name</td>
+                                                <td class="small text-muted" style="white-space:nowrap">
+                                                    @if (tm.RefereeTeam != null)
+                                                    {
+                                                        <i class="bi bi-whistle me-1" title="Referee"></i>@tm.RefereeTeam.Name
+                                                    }
+                                                    else { <span>–</span> }
+                                                </td>
                                                 <td class="small">
                                                     @if (done && match != null) { int h = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId); int a = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId); <strong>@h–@a</strong> }
                                                     else if (match?.Status == MatchStatus.InProgress) { <span class="badge bg-warning text-dark">Live</span> }

@@ -130,6 +130,7 @@ public class TournamentsController : Controller
             .Include(t => t.TournamentMatches).ThenInclude(tm => tm.Match).ThenInclude(m => m!.Sets)
             .Include(t => t.TournamentMatches).ThenInclude(tm => tm.HomeTeam)
             .Include(t => t.TournamentMatches).ThenInclude(tm => tm.AwayTeam)
+            .Include(t => t.TournamentMatches).ThenInclude(tm => tm.RefereeTeam)
             .Include(t => t.TournamentMatches).ThenInclude(tm => tm.Pool)
             .FirstOrDefaultAsync(t => t.Id == id);
 
@@ -317,10 +318,11 @@ public class TournamentsController : Controller
                 .ToList();
 
             var pairs = RoundRobin(teamIds);
+            var poolMatchList = new List<TournamentMatch>();
             int matchNum = 1;
             foreach (var (home, away) in pairs)
             {
-                _context.TournamentMatches.Add(new TournamentMatch
+                var tm = new TournamentMatch
                 {
                     TournamentId = id,
                     PoolId = pool.Id,
@@ -329,8 +331,14 @@ public class TournamentsController : Controller
                     AwayTeamId = away,
                     Label = $"{pool.Name} M{matchNum++}",
                     SortOrder = sort++
-                });
+                };
+                poolMatchList.Add(tm);
+                _context.TournamentMatches.Add(tm);
             }
+
+            // Referee rotation: match N is worked by home team of match N+2
+            for (int i = 0; i + 2 < poolMatchList.Count; i++)
+                poolMatchList[i].RefereeTeamId = poolMatchList[i + 2].HomeTeamId;
         }
 
         // Cross-pool matches for Doubles tournaments
@@ -745,19 +753,25 @@ public class TournamentsController : Controller
     private async Task<int?> ResolveTeamFromSource(int sourceMatchId, bool fromWinner)
     {
         var source = await _context.TournamentMatches
-            .Include(tm => tm.Match)
+            .Include(tm => tm.Match).ThenInclude(m => m!.Sets)
             .FirstOrDefaultAsync(tm => tm.Id == sourceMatchId);
 
-        if (source?.Match == null || source.Match.Status != MatchStatus.Completed)
-            return null;
+        if (source?.Match == null) return null;
 
-        if (source.WinnerTeamId == null) return null;
-
-        if (fromWinner) return source.WinnerTeamId;
-
-        // Loser = the team that is NOT the winner
         var match = source.Match;
-        return source.WinnerTeamId == match.HomeTeamId ? match.AwayTeamId : match.HomeTeamId;
+
+        // Determine leader from completed sets (works for fully-done matches and
+        // in-progress ones where at least 1 set has been decided).
+        int homeSets = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId);
+        int awaySets = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId);
+
+        // Require at least one set decided and a clear leader (not tied)
+        if (homeSets == awaySets) return null;
+
+        int winnerId = homeSets > awaySets ? match.HomeTeamId : match.AwayTeamId;
+        int loserId  = winnerId == match.HomeTeamId ? match.AwayTeamId : match.HomeTeamId;
+
+        return fromWinner ? winnerId : loserId;
     }
 
     // ── Delete tournament ─────────────────────────────────────────────────────
