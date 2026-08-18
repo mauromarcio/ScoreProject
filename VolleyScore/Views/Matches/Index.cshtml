@@ -111,8 +111,7 @@
                                                class="btn btn-sm btn-outline-dark" title="Score Display" target="_blank">
                                                 <i class="bi bi-display"></i>
                                             </a>
-                                            <a asp-controller="Score" asp-action="Display" asp-route-id="@m.Id"
-                                               href="@Url.Action("Display", "Score", new { id = m.Id })/?mirror=1"
+                                            <a href="@Url.Action("Display", "Score", new { id = m.Id })?mirror=1"
                                                class="btn btn-sm btn-outline-secondary" title="Mirror Display (audience)" target="_blank">
                                                 <i class="bi bi-symmetry-horizontal"></i>
                                             </a>
