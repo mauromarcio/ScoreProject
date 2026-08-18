@@ -33,7 +33,7 @@
                 <!-- Tournament Type -->
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Tournament Type</label>
-                    <div class="d-flex gap-3">
+                    <div class="d-flex gap-3 flex-wrap">
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="TournamentType" id="typeSingles"
                                    value="0" checked onchange="onTypeChange()">
@@ -46,6 +46,13 @@
                                    value="1" onchange="onTypeChange()">
                             <label class="form-check-label" for="typeDoubles">
                                 <i class="bi bi-person-arms-up me-1"></i>Doubles (2v2)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="TournamentType" id="typeFourPlayer"
+                                   value="2" onchange="onTypeChange()">
+                            <label class="form-check-label" for="typeFourPlayer">
+                                <i class="bi bi-people-fill me-1"></i>Four-Player (4v4)
                             </label>
                         </div>
                     </div>
@@ -129,6 +136,31 @@
                     </div>
                 </div>
 
+                <!-- Four-player settings -->
+                <div id="fourPlayerSection" class="border rounded p-3 mb-3 bg-light" style="display:none">
+                    <div class="fw-semibold mb-2 text-primary">
+                        <i class="bi bi-people-fill me-1"></i>Four-Player (4v4) Configuration
+                    </div>
+                    <p class="small text-muted mb-2">
+                        6 teams, 1 pool. Every team plays each other once. Top 2 advance straight to semi-finals;
+                        3rd vs 6th and 4th vs 5th play in — winners join semi-finals, losers play 3rd Place.
+                        Final is best of 3 sets.
+                    </p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Pool Scoring</label>
+                            <div class="form-control-plaintext small">25 points, cap 27 (pre-set)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Final Scoring</label>
+                            <div class="form-control-plaintext small">Best of 3 sets, 15 points (pre-set)</div>
+                        </div>
+                    </div>
+                    <!-- Hidden defaults for four-player -->
+                    <input type="hidden" id="fpNumberOfPools" name="NumberOfPools" value="1" />
+                    <input type="hidden" id="fpTeamsAdvancing" name="TeamsAdvancingPerPool" value="6" />
+                </div>
+
                 <!-- Knockout round set configuration -->
                 <div class="border rounded p-3 mb-4">
                     <div class="fw-semibold mb-2 text-primary">
@@ -177,33 +209,38 @@
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
     <script>
         function onTypeChange() {
-            var isDoubles = document.getElementById('typeDoubles').checked;
-            var doublesSection = document.getElementById('doublesSection');
-            var inp = document.getElementById('inpMaxTeams');
+            var isDoubles     = document.getElementById('typeDoubles').checked;
+            var isFourPlayer  = document.getElementById('typeFourPlayer').checked;
+            var doublesSection     = document.getElementById('doublesSection');
+            var fourPlayerSection  = document.getElementById('fourPlayerSection');
+            var inp  = document.getElementById('inpMaxTeams');
             var hint = document.getElementById('hintMaxTeams');
-            var lbl = document.getElementById('lblMaxTeams');
+            var lbl  = document.getElementById('lblMaxTeams');
+
+            doublesSection.style.display    = isDoubles    ? 'block' : 'none';
+            fourPlayerSection.style.display = isFourPlayer ? 'block' : 'none';
 
             if (isDoubles) {
-                doublesSection.style.display = 'block';
-                inp.min = 4;
-                inp.max = 80;
+                inp.min = 4; inp.max = 80;
                 if (parseInt(inp.value) < 4) inp.value = 8;
                 if (parseInt(inp.value) > 80) inp.value = 80;
                 hint.textContent = '4–80 doubles pairs';
-                lbl.textContent = 'Max Pairs';
+                lbl.textContent  = 'Max Pairs';
+            } else if (isFourPlayer) {
+                inp.min = 6; inp.max = 6; inp.value = 6;
+                hint.textContent = '6 teams (fixed for 4v4 format)';
+                lbl.textContent  = 'Teams';
             } else {
-                doublesSection.style.display = 'none';
-                inp.min = 2;
-                inp.max = 50;
+                inp.min = 2; inp.max = 50;
                 if (parseInt(inp.value) > 50) inp.value = 50;
                 hint.textContent = '2–50 teams';
-                lbl.textContent = 'Max Teams';
+                lbl.textContent  = 'Max Teams';
             }
         }
 
-        // Restore state if validation failed and page was re-rendered with Doubles selected
         document.addEventListener('DOMContentLoaded', function () {
-            if (document.getElementById('typeDoubles').checked) onTypeChange();
+            var sel = document.querySelector('input[name="TournamentType"]:checked');
+            if (sel && sel.value !== '0') onTypeChange();
         });
     </script>
 }

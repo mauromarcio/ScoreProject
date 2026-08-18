@@ -50,6 +50,12 @@ public class Match
     /// <summary>True for Doubles (beach 2v2) matches – only 2 players per side required to start.</summary>
     public bool IsDoubles { get; set; } = false;
 
+    /// <summary>True for Four-Player (4v4) matches – 4 positions per side, rotation 1→2→3→4.</summary>
+    public bool IsFourPlayer { get; set; } = false;
+
+    /// <summary>When true the match is hidden from the default Matches list (completed matches).</summary>
+    public bool IsArchived { get; set; } = false;
+
     [Range(1, 99)]
     public int PointsToWin { get; set; } = 25;
 

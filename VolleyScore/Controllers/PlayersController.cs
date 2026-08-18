@@ -145,9 +145,19 @@ public class PlayersController : Controller
         int? teamId = player?.TeamId;
         if (player != null)
         {
-            _context.Players.Remove(player);
-            await _context.SaveChangesAsync();
-            TempData["Success"] = "Player deleted.";
+            try
+            {
+                // Remove court position history first (avoids FK constraint)
+                var positions = await _context.PlayerPositions.Where(pp => pp.PlayerId == id).ToListAsync();
+                _context.PlayerPositions.RemoveRange(positions);
+                _context.Players.Remove(player);
+                await _context.SaveChangesAsync();
+                TempData["Success"] = $"Player {player.Name} deleted.";
+            }
+            catch (DbUpdateException)
+            {
+                TempData["Error"] = $"Cannot delete {player.Name} — they are still referenced by match data.";
+            }
         }
         return RedirectToAction(nameof(Index), new { teamId });
     }

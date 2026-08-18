@@ -155,7 +155,7 @@
     </div>
 
     <!-- ── Main court area ────────────────────────────────────────────────── -->
-    <div class="court-body @(Model.Match.IsDoubles ? "doubles-mode" : "")">
+    <div class="court-body @(Model.Match.IsDoubles ? "doubles-mode" : Model.Match.IsFourPlayer ? "quad-mode" : "")">
 
         <!-- Left roster panel -->
         <div class="player-roster" id="leftRoster">

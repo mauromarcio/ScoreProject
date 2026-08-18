@@ -37,9 +37,10 @@ public enum TournamentPhase
     QuarterFinal = 4
 }
 
-/// <summary>Determines the format of the tournament (indoor 6v6 or beach 2v2)</summary>
+/// <summary>Determines the format of the tournament (indoor 6v6, beach 2v2, or four-player 4v4)</summary>
 public enum TournamentType
 {
-    Singles = 0,
-    Doubles = 1
+    Singles    = 0,
+    Doubles    = 1,
+    FourPlayer = 2
 }

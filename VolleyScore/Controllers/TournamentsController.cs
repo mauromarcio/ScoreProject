@@ -50,6 +50,22 @@ public class TournamentsController : Controller
             if (tournament.MaxTeams > 80)
                 ModelState.AddModelError("MaxTeams", "Doubles tournaments allow at most 80 doubles pairs.");
         }
+        else if (tournament.TournamentType == TournamentType.FourPlayer)
+        {
+            tournament.MaxTeams          = 6;
+            tournament.NumberOfPools     = 1;
+            tournament.TeamsAdvancingPerPool = 6;
+            tournament.PointsToWin       = 25;
+            tournament.PointsCap         = 27;
+            tournament.SetsPerMatch      = 1;
+            tournament.FinalSetsPerMatch = 3;
+            tournament.FinalPointsToWin  = 15;
+            tournament.FinalPointsCap    = 0;
+            tournament.SemifinalSetsPerMatch  = 1;
+            tournament.SemifinalPointsToWin   = 25;
+            tournament.SemifinalPointsCap     = 27;
+            tournament.PlayoffSetsPerMatch    = 1;
+        }
         else
         {
             if (tournament.MaxTeams > 50)
@@ -522,18 +538,19 @@ public class TournamentsController : Controller
 
         var match = new Match
         {
-            MatchReference = tm.Label,
-            HomeTeamId     = homeTeamId.Value,
-            AwayTeamId     = awayTeamId.Value,
-            TotalSets      = sets,
-            InitialScore   = tournament.InitialScore,
-            Status         = MatchStatus.Setup,
+            MatchReference   = tm.Label,
+            HomeTeamId       = homeTeamId.Value,
+            AwayTeamId       = awayTeamId.Value,
+            TotalSets        = sets,
+            InitialScore     = tournament.InitialScore,
+            Status           = MatchStatus.Setup,
             CurrentSetNumber = 1,
-            HomeTeamOnLeft = true,
-            ServingTeamId  = homeTeamId.Value,
-            IsDoubles      = tournament.TournamentType == TournamentType.Doubles,
-            PointsToWin    = ptw,
-            PointsCap      = cap
+            HomeTeamOnLeft   = true,
+            ServingTeamId    = homeTeamId.Value,
+            IsDoubles        = tournament.TournamentType == TournamentType.Doubles,
+            IsFourPlayer     = tournament.TournamentType == TournamentType.FourPlayer,
+            PointsToWin      = ptw,
+            PointsCap        = cap
         };
         _context.Matches.Add(match);
         await _context.SaveChangesAsync();
@@ -592,9 +609,33 @@ public class TournamentsController : Controller
 
         int sort = 1000;
         int totalAdvancing = tournament.TeamsAdvancingPerPool * tournament.Pools.Count;
-        bool useQF = totalAdvancing >= 8 && standings.Count >= 8;
+        bool use6Team = standings.Count == 6;
+        bool useQF = !use6Team && totalAdvancing >= 8 && standings.Count >= 8;
 
-        if (useQF)
+        if (use6Team)
+        {
+            // 6-team bracket:
+            // Play-in: 3rd vs 6th, 4th vs 5th
+            // 3rd Place: loser(PI1) vs loser(PI2)
+            // SF1: 1st vs winner(PI1),  SF2: 2nd vs winner(PI2)
+            // Final: SF1 winner vs SF2 winner
+            var pi1 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "Play-in 1 (3 v 6)", HomeTeamId = standings[2].TeamId, AwayTeamId = standings[5].TeamId, SortOrder = sort++ };
+            var pi2 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "Play-in 2 (4 v 5)", HomeTeamId = standings[3].TeamId, AwayTeamId = standings[4].TeamId, SortOrder = sort++ };
+            _context.TournamentMatches.AddRange(pi1, pi2);
+            await _context.SaveChangesAsync();
+
+            // 3rd place: play-in losers
+            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.ThirdPlace, Label = "3rd Place", HomeSourceMatchId = pi1.Id, HomeFromWinner = false, AwaySourceMatchId = pi2.Id, AwayFromWinner = false, SortOrder = sort++ });
+
+            // SFs: bye seeds play winner of play-ins
+            var sf1 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.SemiFinal, Label = "Semi-Final 1", HomeTeamId = standings[0].TeamId, AwaySourceMatchId = pi1.Id, AwayFromWinner = true, SortOrder = sort++ };
+            var sf2 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.SemiFinal, Label = "Semi-Final 2", HomeTeamId = standings[1].TeamId, AwaySourceMatchId = pi2.Id, AwayFromWinner = true, SortOrder = sort++ };
+            _context.TournamentMatches.AddRange(sf1, sf2);
+            await _context.SaveChangesAsync();
+
+            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.Final, Label = "Final", HomeSourceMatchId = sf1.Id, HomeFromWinner = true, AwaySourceMatchId = sf2.Id, AwayFromWinner = true, SortOrder = sort++ });
+        }
+        else if (useQF)
         {
             // Quarter-final bracket (8 teams): QF → SF → Final
             // Seedings: QF1=1v8, QF2=4v5, QF3=2v7, QF4=3v6
@@ -629,8 +670,9 @@ public class TournamentsController : Controller
         await _context.SaveChangesAsync();
 
         TempData["Success"] = useQF
-            ? "Quarter-final bracket generated (8-team draw)."
-            : "Knockout bracket generated.";
+            use6Team ? "6-team bracket generated (play-ins + semi-finals + final)."
+            : useQF  ? "Quarter-final bracket generated (8-team draw)."
+            :          "Knockout bracket generated.";
         return RedirectToAction(nameof(Manage), new { id });
     }
 

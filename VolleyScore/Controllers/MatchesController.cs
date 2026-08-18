@@ -25,15 +25,36 @@ public class MatchesController : Controller
     }
 
     // GET: Matches
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(bool showArchived = false)
     {
-        var matches = await _context.Matches
+        var query = _context.Matches
             .Include(m => m.HomeTeam)
             .Include(m => m.AwayTeam)
             .Include(m => m.Sets)
+            .AsQueryable();
+
+        if (!showArchived)
+            query = query.Where(m => !m.IsArchived);
+
+        var matches = await query
             .OrderByDescending(m => m.CreatedAt)
             .ToListAsync();
+
+        ViewBag.ShowArchived = showArchived;
         return View(matches);
+    }
+
+    // POST: Matches/Archive/5
+    [HttpPost]
+    public async Task<IActionResult> Archive(int id)
+    {
+        var match = await _context.Matches.FindAsync(id);
+        if (match != null)
+        {
+            match.IsArchived = !match.IsArchived;
+            await _context.SaveChangesAsync();
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     // GET: Matches/Create
@@ -182,8 +203,8 @@ public class MatchesController : Controller
             .FirstOrDefaultAsync(m => m.Id == id);
         if (match == null) return NotFound();
 
-        // Doubles matches require 2 players per side; standard matches require 6
-        int required = match.IsDoubles ? 2 : 6;
+        // Player requirement by format
+        int required = match.IsDoubles ? 2 : (match.IsFourPlayer ? 4 : 6);
 
         var homeCount = match.PlayerPositions.Count(pp =>
             pp.SetNumber == match.CurrentSetNumber && pp.Side == "Home");
@@ -215,7 +236,7 @@ public class MatchesController : Controller
             .Where(pp => pp.SetNumber == currentSet.SetNumber && pp.Side == "Away")
             .ToList();
 
-        int posCount = match.IsDoubles ? 2 : 6;
+        int posCount = match.IsDoubles ? 2 : (match.IsFourPlayer ? 4 : 6);
         List<PositionDto> BuildPositions(List<PlayerPosition> positions) =>
             Enumerable.Range(1, posCount).Select(pos =>
             {

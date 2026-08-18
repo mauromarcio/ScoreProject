@@ -85,6 +85,7 @@ public class ScoreController : Controller
             HomeTeamOnLeft = match.HomeTeamOnLeft
         };
 
+        ViewBag.MirrorMode = Request.Query["mirror"] == "1";
         return View(vm);
     }
 
@@ -112,21 +113,21 @@ public class ScoreController : Controller
         if (error != null) return error;
 
         bool forward = req.Direction != "back";
-        int rotMod = match!.IsDoubles ? 2 : 6;
+        int rotMod = match!.IsDoubles ? 2 : (match.IsFourPlayer ? 4 : 6);
 
         if (req.Team == "Home")
         {
             currentSet!.HomeRotationIndex = forward
                 ? (currentSet.HomeRotationIndex + 1) % rotMod
                 : (currentSet.HomeRotationIndex - 1 + rotMod) % rotMod;
-            await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, forward);
+            await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, match.IsFourPlayer, forward);
         }
         else
         {
             currentSet!.AwayRotationIndex = forward
                 ? (currentSet.AwayRotationIndex + 1) % rotMod
                 : (currentSet.AwayRotationIndex - 1 + rotMod) % rotMod;
-            await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, forward);
+            await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, forward);
         }
 
         await _context.SaveChangesAsync();
@@ -306,7 +307,7 @@ public class ScoreController : Controller
     /// Standard rotation map: 1→6, 2→1, 3→2, 4→3, 5→4, 6→5
     /// Doubles rotation map: 1→2, 2→1
     /// </summary>
-    private async Task RotatePlayers(int matchId, int setNumber, string side, int rotationIndex, bool isDoubles = false, bool forward = true)
+    private async Task RotatePlayers(int matchId, int setNumber, string side, int rotationIndex, bool isDoubles = false, bool isFourPlayer = false, bool forward = true)
     {
         var positions = await _context.PlayerPositions
             .Where(pp => pp.MatchId == matchId && pp.SetNumber == setNumber && pp.Side == side)
@@ -328,9 +329,13 @@ public class ScoreController : Controller
                 Side      = pp.Side,
                 Position  = isDoubles
                     ? pp.Position switch { 1 => 2, 2 => 1, _ => pp.Position }
-                    : forward
-                        ? pp.Position switch { 1 => 6, 2 => 1, 3 => 2, 4 => 3, 5 => 4, 6 => 5, _ => pp.Position }
-                        : pp.Position switch { 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6, 6 => 1, _ => pp.Position }
+                    : isFourPlayer
+                        ? forward
+                            ? pp.Position switch { 1 => 4, 2 => 1, 3 => 2, 4 => 3, _ => pp.Position }
+                            : pp.Position switch { 1 => 2, 2 => 3, 3 => 4, 4 => 1, _ => pp.Position }
+                        : forward
+                            ? pp.Position switch { 1 => 6, 2 => 1, 3 => 2, 4 => 3, 5 => 4, 6 => 5, _ => pp.Position }
+                            : pp.Position switch { 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6, 6 => 1, _ => pp.Position }
             });
         }
     }

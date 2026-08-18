@@ -2,23 +2,49 @@
 @model IEnumerable<VolleyScore.Models.Match>
 @{
     ViewData["Title"] = "Matches";
+    bool showArchived = (bool)(ViewBag.ShowArchived ?? false);
 }
 
 <div class="container-fluid py-4 px-4">
-    <div class="d-flex align-items-center mb-4">
+    <div class="d-flex align-items-center mb-4 flex-wrap gap-2">
         <h2 class="mb-0"><i class="bi bi-trophy me-2 text-warning"></i>Matches</h2>
-        <a asp-action="Create" class="btn btn-primary ms-auto">
-            <i class="bi bi-plus-circle me-1"></i> New Match
-        </a>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+            <a asp-action="Index" asp-route-showArchived="@(!showArchived)"
+               class="btn btn-sm btn-outline-secondary">
+                @if (showArchived)
+                {
+                    <i class="bi bi-eye-slash me-1"></i><text>Hide Archived</text>
+                }
+                else
+                {
+                    <i class="bi bi-archive me-1"></i><text>Show Archived</text>
+                }
+            </a>
+            <a asp-action="Create" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-1"></i>New Match
+            </a>
+        </div>
     </div>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
 
     @if (!Model.Any())
     {
         <div class="card">
             <div class="card-body text-center py-5 text-muted">
                 <i class="bi bi-calendar-x" style="font-size:2rem"></i>
-                <p class="mt-2">No matches created yet.</p>
-                <a asp-action="Create" class="btn btn-primary">Create First Match</a>
+                <p class="mt-2">@(showArchived ? "No archived matches." : "No active matches.")</p>
+                @if (!showArchived)
+                {
+                    <a asp-action="Create" class="btn btn-primary">Create First Match</a>
+                }
             </div>
         </div>
     }
@@ -46,8 +72,11 @@
                                 var currentSet = m.Sets.FirstOrDefault(s => s.SetNumber == m.CurrentSetNumber);
                                 var homeSets = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
                                 var awaySets = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
-                                <tr>
-                                    <td><strong>@m.MatchReference</strong></td>
+                                <tr class="@(m.IsArchived ? "table-secondary" : "")">
+                                    <td>
+                                        <strong>@m.MatchReference</strong>
+                                        @if (m.IsArchived) { <span class="badge bg-secondary ms-1">Archived</span> }
+                                    </td>
                                     <td>@m.HomeTeam?.Name</td>
                                     <td class="text-center">
                                         <span class="fw-bold text-success">@homeSets</span>
@@ -73,7 +102,7 @@
                                         <span class="badge @cls">@txt</span>
                                     </td>
                                     <td class="text-center">
-                                        <div class="d-flex gap-1 justify-content-center">
+                                        <div class="d-flex gap-1 justify-content-center flex-wrap">
                                             <a asp-action="Court" asp-route-id="@m.Id"
                                                class="btn btn-sm btn-primary" title="Open Court">
                                                 <i class="bi bi-grid-3x3-gap"></i>
@@ -82,6 +111,17 @@
                                                class="btn btn-sm btn-outline-dark" title="Score Display" target="_blank">
                                                 <i class="bi bi-display"></i>
                                             </a>
+                                            <a asp-controller="Score" asp-action="Display" asp-route-id="@m.Id"
+                                               href="@Url.Action("Display", "Score", new { id = m.Id })/?mirror=1"
+                                               class="btn btn-sm btn-outline-secondary" title="Mirror Display (audience)" target="_blank">
+                                                <i class="bi bi-symmetry-horizontal"></i>
+                                            </a>
+                                            <form asp-action="Archive" asp-route-id="@m.Id" method="post" class="d-inline">
+                                                <button type="submit" class="btn btn-sm @(m.IsArchived ? "btn-warning" : "btn-outline-secondary")"
+                                                        title="@(m.IsArchived ? "Unarchive" : "Archive")">
+                                                    <i class="bi bi-archive@(m.IsArchived ? "-fill" : "")"></i>
+                                                </button>
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>

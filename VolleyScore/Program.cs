@@ -247,6 +247,16 @@ static async Task ApplySchemaUpdates(VolleyScoreContext db)
         IF NOT EXISTS (SELECT 1 FROM sys.columns
                        WHERE object_id = OBJECT_ID(N'Tournaments') AND name = N'FinalPointsCap')
             ALTER TABLE Tournaments ADD FinalPointsCap INT NOT NULL DEFAULT 0;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Matches') AND name = N'IsFourPlayer')
+            ALTER TABLE Matches ADD IsFourPlayer BIT NOT NULL DEFAULT 0;");
+
+    await db.Database.ExecuteSqlRawAsync(@"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns
+                       WHERE object_id = OBJECT_ID(N'Matches') AND name = N'IsArchived')
+            ALTER TABLE Matches ADD IsArchived BIT NOT NULL DEFAULT 0;");
 }
 
 // ── Middleware Pipeline ───────────────────────────────────────────────────────

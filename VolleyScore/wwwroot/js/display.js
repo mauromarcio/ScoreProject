@@ -124,7 +124,8 @@
         connection.on('SidesSwitched', function (data) {
             var row = document.getElementById('displayScoreRow');
             if (row) {
-                row.style.flexDirection = data.homeTeamOnLeft ? 'row' : 'row-reverse';
+                var effectiveLeft = DISPLAY_DATA.mirrorMode ? !data.homeTeamOnLeft : data.homeTeamOnLeft;
+                row.style.flexDirection = effectiveLeft ? 'row' : 'row-reverse';
             }
         });
 

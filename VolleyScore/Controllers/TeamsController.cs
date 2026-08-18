@@ -96,9 +96,16 @@ public class TeamsController : Controller
         var team = await _context.Teams.FindAsync(id);
         if (team != null)
         {
-            _context.Teams.Remove(team);
-            await _context.SaveChangesAsync();
-            TempData["Success"] = $"Team deleted.";
+            try
+            {
+                _context.Teams.Remove(team);
+                await _context.SaveChangesAsync();
+                TempData["Success"] = $"Team '{team.Name}' deleted.";
+            }
+            catch (DbUpdateException)
+            {
+                TempData["Error"] = $"Cannot delete '{team.Name}' — they are still enrolled in a tournament or referenced by a match. Remove those references first.";
+            }
         }
         return RedirectToAction(nameof(Index));
     }

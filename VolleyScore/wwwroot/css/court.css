@@ -296,6 +296,28 @@
 /* Right half: back column is col2. Move pos2 next to pos1 in the back column. */
 .doubles-mode .court-half.right-half .position-slot[data-position="2"] { grid-row: 2; grid-column: 2; }
 
+/* ── Four-player layout: 2×2 grid (positions 1-4) ────────────────────────
+   Left half (net on right):
+     col1=back, col2=near-net
+     row1: pos4(back-left)  pos3(front-left)
+     row2: pos1(back-right) pos2(front-right)  ← pos1 serves
+   Right half (net on left, mirror):
+     row1: pos3(front-right) pos4(back-right)
+     row2: pos2(front-left)  pos1(back-left)
+*/
+.quad-mode .court-half {
+    grid-template-rows: 1fr 1fr;
+}
+.quad-mode .court-half.left-half .position-slot[data-position="4"] { grid-row: 1; grid-column: 1; }
+.quad-mode .court-half.left-half .position-slot[data-position="3"] { grid-row: 1; grid-column: 2; }
+.quad-mode .court-half.left-half .position-slot[data-position="1"] { grid-row: 2; grid-column: 1; }
+.quad-mode .court-half.left-half .position-slot[data-position="2"] { grid-row: 2; grid-column: 2; }
+
+.quad-mode .court-half.right-half .position-slot[data-position="3"] { grid-row: 1; grid-column: 1; }
+.quad-mode .court-half.right-half .position-slot[data-position="4"] { grid-row: 1; grid-column: 2; }
+.quad-mode .court-half.right-half .position-slot[data-position="2"] { grid-row: 2; grid-column: 1; }
+.quad-mode .court-half.right-half .position-slot[data-position="1"] { grid-row: 2; grid-column: 2; }
+
 /* ── Action toolbar ─────────────────────────────────────────────────────── */
 .court-toolbar {
     display: flex;

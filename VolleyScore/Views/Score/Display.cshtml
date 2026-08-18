@@ -5,6 +5,8 @@
 @{
     ViewData["Title"] = Model.MatchReference + " – Display";
     Layout = "_LayoutDisplay";
+    bool mirrorMode = (bool)(ViewBag.MirrorMode ?? false);
+    bool effectiveHomeOnLeft = mirrorMode ? !Model.HomeTeamOnLeft : Model.HomeTeamOnLeft;
 }
 
 @section Styles {
@@ -256,7 +258,7 @@
 
     <!-- Main score area -->
     <div class="display-score-row" id="displayScoreRow"
-         style="@(Model.HomeTeamOnLeft ? "" : "flex-direction:row-reverse")">
+         style="@(effectiveHomeOnLeft ? "" : "flex-direction:row-reverse")">
 
         <!-- Left team (Home) -->
         <div class="display-team" id="displayHomeTeam">
@@ -356,7 +358,8 @@
         currentSetNumber: @Model.CurrentSetNumber,
         totalSets: @Model.TotalSets,
         homeIsServing: @Model.HomeIsServing.ToString().ToLower(),
-        homeTeamOnLeft: @Model.HomeTeamOnLeft.ToString().ToLower()
+        homeTeamOnLeft: @Model.HomeTeamOnLeft.ToString().ToLower(),
+        mirrorMode: @mirrorMode.ToString().ToLower()
     };
 </script>
 <script src="~/js/display.js" asp-append-version="true"></script>
