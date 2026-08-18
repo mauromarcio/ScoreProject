@@ -669,8 +669,7 @@ public class TournamentsController : Controller
         tournament.Status = TournamentStatus.Knockouts;
         await _context.SaveChangesAsync();
 
-        TempData["Success"] = useQF
-            use6Team ? "6-team bracket generated (play-ins + semi-finals + final)."
+        TempData["Success"] = use6Team ? "6-team bracket generated (play-ins + semi-finals + final)."
             : useQF  ? "Quarter-final bracket generated (8-team draw)."
             :          "Knockout bracket generated.";
         return RedirectToAction(nameof(Manage), new { id });
