@@ -193,14 +193,14 @@ public class ScoreController : Controller
             // If the team that was NOT serving wins the rally → they earn the serve and rotate
             if (scorerIsHome != serverIsHome)
             {
-                int rotMod = match!.IsDoubles ? 2 : 6;
+                int rotMod = match!.IsDoubles ? 2 : (match.IsFourPlayer ? 4 : 6);
                 if (scorerIsHome)
                 {
                     // Home team earns serve: rotate home players
                     currentSet.HomeIsServing = true;
                     currentSet.HomeRotationIndex = (currentSet.HomeRotationIndex + 1) % rotMod;
                     match.ServingTeamId = match.HomeTeamId;
-                    await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles);
+                    await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, match.IsFourPlayer);
                 }
                 else
                 {
@@ -208,7 +208,7 @@ public class ScoreController : Controller
                     currentSet.HomeIsServing = false;
                     currentSet.AwayRotationIndex = (currentSet.AwayRotationIndex + 1) % rotMod;
                     match.ServingTeamId = match.AwayTeamId;
-                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles);
+                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer);
                 }
             }
 

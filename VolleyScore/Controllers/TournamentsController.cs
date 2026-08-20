@@ -616,16 +616,13 @@ public class TournamentsController : Controller
         {
             // 6-team bracket:
             // Play-in: 3rd vs 6th, 4th vs 5th
-            // 3rd Place: loser(PI1) vs loser(PI2)
             // SF1: 1st vs winner(PI1),  SF2: 2nd vs winner(PI2)
+            // 3rd Place: loser(SF1) vs loser(SF2)
             // Final: SF1 winner vs SF2 winner
             var pi1 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "Play-in 1 (3 v 6)", HomeTeamId = standings[2].TeamId, AwayTeamId = standings[5].TeamId, SortOrder = sort++ };
             var pi2 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.QuarterFinal, Label = "Play-in 2 (4 v 5)", HomeTeamId = standings[3].TeamId, AwayTeamId = standings[4].TeamId, SortOrder = sort++ };
             _context.TournamentMatches.AddRange(pi1, pi2);
             await _context.SaveChangesAsync();
-
-            // 3rd place: play-in losers
-            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.ThirdPlace, Label = "3rd Place", HomeSourceMatchId = pi1.Id, HomeFromWinner = false, AwaySourceMatchId = pi2.Id, AwayFromWinner = false, SortOrder = sort++ });
 
             // SFs: bye seeds play winner of play-ins
             var sf1 = new TournamentMatch { TournamentId = id, Phase = TournamentPhase.SemiFinal, Label = "Semi-Final 1", HomeTeamId = standings[0].TeamId, AwaySourceMatchId = pi1.Id, AwayFromWinner = true, SortOrder = sort++ };
@@ -633,6 +630,8 @@ public class TournamentsController : Controller
             _context.TournamentMatches.AddRange(sf1, sf2);
             await _context.SaveChangesAsync();
 
+            // 3rd place: SF losers
+            _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.ThirdPlace, Label = "3rd Place", HomeSourceMatchId = sf1.Id, HomeFromWinner = false, AwaySourceMatchId = sf2.Id, AwayFromWinner = false, SortOrder = sort++ });
             _context.TournamentMatches.Add(new TournamentMatch { TournamentId = id, Phase = TournamentPhase.Final, Label = "Final", HomeSourceMatchId = sf1.Id, HomeFromWinner = true, AwaySourceMatchId = sf2.Id, AwayFromWinner = true, SortOrder = sort++ });
         }
         else if (useQF)
