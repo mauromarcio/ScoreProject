@@ -510,7 +510,11 @@
                                             }
                                         </td>
                                         <td>
-                                            @if (match == null && tm.HomeTeamId.HasValue && tm.AwayTeamId.HasValue)
+                                            @{
+                                                bool hasHome = tm.HomeTeamId.HasValue || tm.HomeSourceMatchId.HasValue;
+                                                bool hasAway = tm.AwayTeamId.HasValue || tm.AwaySourceMatchId.HasValue;
+                                            }
+                                            @if (match == null && hasHome && hasAway)
                                             {
                                                 <a asp-action="StartTournamentMatch"
                                                    asp-route-id="@Model.Id"

@@ -124,10 +124,13 @@ public class ScoreController : Controller
         }
         else
         {
-            currentSet!.AwayRotationIndex = forward
+            // Invert direction for Away so both teams appear to rotate clockwise on screen
+            // (mirrored court layout means same map looks counter-clockwise for Away)
+            bool awayForward = !forward;
+            currentSet!.AwayRotationIndex = awayForward
                 ? (currentSet.AwayRotationIndex + 1) % rotMod
                 : (currentSet.AwayRotationIndex - 1 + rotMod) % rotMod;
-            await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, forward);
+            await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, awayForward);
         }
 
         await _context.SaveChangesAsync();
@@ -204,11 +207,12 @@ public class ScoreController : Controller
                 }
                 else
                 {
-                    // Away team earns serve: rotate away players
+                    // Away team earns serve: rotate away players using inverted direction
+                    // so both sides appear clockwise on screen (mirrored layout effect)
                     currentSet.HomeIsServing = false;
-                    currentSet.AwayRotationIndex = (currentSet.AwayRotationIndex + 1) % rotMod;
+                    currentSet.AwayRotationIndex = (currentSet.AwayRotationIndex - 1 + rotMod) % rotMod;
                     match.ServingTeamId = match.AwayTeamId;
-                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer);
+                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, false);
                 }
             }
 

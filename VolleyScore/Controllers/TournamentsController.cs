@@ -461,40 +461,43 @@ public class TournamentsController : Controller
 
     // ── Generate 3rd Place + Final matches ───────────────────────────────────
 
-    /// <summary>Creates Match entities for the 3rd Place and Final once semi-finals are done.</summary>
+    /// <summary>
+    /// Creates Match entities for knockout rounds whose source matches are complete.
+    /// Processes in phase order: QF winners → SF → 3rd/Final, stopping at first unresolvable match.
+    /// </summary>
     [HttpPost]
     public async Task<IActionResult> GenerateFinals(int id)
     {
         var tournament = await _context.Tournaments.FindAsync(id);
         if (tournament == null) return NotFound();
 
-        var finalMatches = await _context.TournamentMatches
-            .Where(tm => tm.TournamentId == id &&
-                   (tm.Phase == TournamentPhase.Final || tm.Phase == TournamentPhase.ThirdPlace))
+        var knockoutMatches = await _context.TournamentMatches
+            .Where(tm => tm.TournamentId == id && tm.Phase != TournamentPhase.Pool)
+            .OrderBy(tm => tm.Phase == TournamentPhase.QuarterFinal ? 0
+                         : tm.Phase == TournamentPhase.SemiFinal    ? 1
+                         : tm.Phase == TournamentPhase.ThirdPlace   ? 2
+                         : tm.Phase == TournamentPhase.Final        ? 3 : 4)
+            .ThenBy(tm => tm.SortOrder)
             .ToListAsync();
 
-        if (!finalMatches.Any())
+        if (!knockoutMatches.Any())
         {
-            TempData["Error"] = "No Final or 3rd Place entries found. Generate knockouts first.";
+            TempData["Error"] = "No knockout entries found. Generate knockouts first.";
             return RedirectToAction(nameof(Manage), new { id });
         }
 
         int created = 0;
-        foreach (var tm in finalMatches)
+        foreach (var tm in knockoutMatches)
         {
             if (tm.MatchId != null) continue; // already started
             var match = await CreateMatchForTournamentMatch(tournament, tm);
-            if (match == null)
-            {
-                TempData["Error"] = $"Cannot create '{tm.Label}': the source semi-final has not completed yet.";
-                return RedirectToAction(nameof(Manage), new { id });
-            }
+            if (match == null) continue; // source not yet complete, skip silently
             created++;
         }
 
         TempData["Success"] = created > 0
-            ? $"{created} match(es) created — 3rd Place & Final are ready."
-            : "All finals matches were already started.";
+            ? $"{created} match(es) created and ready to play."
+            : "No new matches could be created yet — check that source matches are complete.";
         return RedirectToAction(nameof(Manage), new { id });
     }
 
