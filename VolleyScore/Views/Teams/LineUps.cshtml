@@ -40,7 +40,7 @@
             font-weight: 600;
             text-align: center;
         }
-        .lineup-table td.pos-cell { text-align: center; font-weight: 700; width: 36px; }
+        .lineup-table td.pos-cell { text-align: center; width: 55px; }
         .lineup-table td.num-cell { text-align: center; width: 44px; }
 
         /* ── Print layout ── */
@@ -119,9 +119,9 @@
                         <table class="lineup-table">
                             <thead>
                                 <tr>
-                                    <th>Pos</th>
                                     <th>#</th>
                                     <th>Player Name</th>
+                                    <th>Pos</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -129,9 +129,9 @@
                                 {
                                     var player = slot <= players.Count ? players[slot - 1] : null;
                                     <tr>
-                                        <td class="pos-cell">@slot</td>
                                         <td class="num-cell">@(player != null ? player.Number.ToString() : "")</td>
                                         <td>@(player?.Name ?? "")</td>
+                                        <td class="pos-cell"></td>
                                     </tr>
                                 }
                             </tbody>
