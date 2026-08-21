@@ -23,7 +23,15 @@
             margin-bottom: 8px;
             border-radius: 4px;
         }
+        /* Table + court side by side */
+        .lineup-body {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
         .lineup-table {
+            flex: 1;
+            min-width: 0;
             width: 100%;
             border-collapse: collapse;
             font-size: .9rem;
@@ -41,14 +49,14 @@
         .lineup-table td.pos-cell { text-align: center; width: 55px; }
         .lineup-table td.num-cell { text-align: center; width: 44px; }
 
+        .lu-court-wrap { flex-shrink: 0; }
+
         @@media print {
             nav, .no-print { display: none !important; }
             @@page { margin: 8mm; size: A4 portrait; }
             body { font-size: 10pt; }
 
-            .lineup-grid {
-                gap: 6px;
-            }
+            .lineup-grid { gap: 6px; }
             .lineup-card {
                 break-inside: avoid;
                 page-break-inside: avoid;
@@ -84,26 +92,90 @@
 
             <div class="lineup-card">
                 <div class="lineup-card-title" data-team-name="@team.Name">@team.Name</div>
-                <table class="lineup-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Player Name</th>
-                            <th>Pos</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (int slot = 1; slot <= slots; slot++)
-                        {
-                            var player = slot <= players.Count ? players[slot - 1] : null;
+                <div class="lineup-body">
+                    <table class="lineup-table">
+                        <thead>
                             <tr>
-                                <td class="num-cell">@(player != null ? player.Number.ToString() : "")</td>
-                                <td>@(player?.Name ?? "")</td>
-                                <td class="pos-cell"></td>
+                                <th>#</th>
+                                <th>Player Name</th>
+                                <th>Pos</th>
                             </tr>
+                        </thead>
+                        <tbody>
+                            @for (int slot = 1; slot <= slots; slot++)
+                            {
+                                var player = slot <= players.Count ? players[slot - 1] : null;
+                                <tr>
+                                    <td class="num-cell">@(player != null ? player.Number.ToString() : "")</td>
+                                    <td>@(player?.Name ?? "")</td>
+                                    <td class="pos-cell"></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                    <!-- Mini court diagram matching /Matches/Court quad/standard layout -->
+                    <div class="lu-court-wrap">
+                        @if (slots == 4)
+                        {
+                            <!-- 4-player diamond: 3-row × 2-col, net on right -->
+                            <!-- row1:_,4 | row2:1,3 | row3:_,2 -->
+                            <svg width="110" height="150" viewBox="0 0 110 150" xmlns="http://www.w3.org/2000/svg">
+                                <!-- Court background -->
+                                <rect x="1" y="1" width="108" height="148" rx="3" fill="#f5f0e0" stroke="#888" stroke-width="1.5"/>
+                                <!-- Net (thick right edge) -->
+                                <line x1="108" y1="1" x2="108" y2="149" stroke="#333" stroke-width="5"/>
+                                <text x="103" y="82" text-anchor="middle" font-size="7" fill="#555"
+                                      transform="rotate(-90 103 82)">NET</text>
+                                <!-- Position 4: col2, row1 → cx=82, cy=25 -->
+                                <circle cx="82" cy="25" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="82" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">4</text>
+                                <!-- Position 1: col1, row2 → cx=28, cy=75 (server) -->
+                                <circle cx="28" cy="75" r="16" fill="white" stroke="#e65100" stroke-width="2.5"/>
+                                <text x="28" y="80" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">1</text>
+                                <text x="28" y="101" text-anchor="middle" font-size="8" font-weight="bold" fill="#c62828">Serve</text>
+                                <!-- Position 3: col2, row2 → cx=82, cy=75 -->
+                                <circle cx="82" cy="75" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="82" y="80" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">3</text>
+                                <!-- Position 2: col2, row3 → cx=82, cy=125 -->
+                                <circle cx="82" cy="125" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="82" y="130" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">2</text>
+                            </svg>
                         }
-                    </tbody>
-                </table>
+                        else
+                        {
+                            <!-- 6-player: 3-row × 2-col, net on right -->
+                            <!-- row1:5,4 | row2:6,3 | row3:1,2 -->
+                            <svg width="110" height="170" viewBox="0 0 110 170" xmlns="http://www.w3.org/2000/svg">
+                                <!-- Court background -->
+                                <rect x="1" y="1" width="108" height="168" rx="3" fill="#f5f0e0" stroke="#888" stroke-width="1.5"/>
+                                <!-- Net (thick right edge) -->
+                                <line x1="108" y1="1" x2="108" y2="169" stroke="#333" stroke-width="5"/>
+                                <text x="103" y="87" text-anchor="middle" font-size="7" fill="#555"
+                                      transform="rotate(-90 103 87)">NET</text>
+                                <!-- Position 5: col1, row1 → cx=28, cy=28 -->
+                                <circle cx="28" cy="28" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="28" y="33" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">5</text>
+                                <!-- Position 4: col2, row1 → cx=82, cy=28 -->
+                                <circle cx="82" cy="28" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="82" y="33" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">4</text>
+                                <!-- Position 6: col1, row2 → cx=28, cy=85 -->
+                                <circle cx="28" cy="85" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="28" y="90" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">6</text>
+                                <!-- Position 3: col2, row2 → cx=82, cy=85 -->
+                                <circle cx="82" cy="85" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="82" y="90" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">3</text>
+                                <!-- Position 1: col1, row3 → cx=28, cy=142 (server) -->
+                                <circle cx="28" cy="142" r="16" fill="white" stroke="#e65100" stroke-width="2.5"/>
+                                <text x="28" y="147" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">1</text>
+                                <text x="28" y="164" text-anchor="middle" font-size="8" font-weight="bold" fill="#c62828">Serve</text>
+                                <!-- Position 2: col2, row3 → cx=82, cy=142 -->
+                                <circle cx="82" cy="142" r="16" fill="white" stroke="#333" stroke-width="2"/>
+                                <text x="82" y="147" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">2</text>
+                            </svg>
+                        }
+                    </div>
+                </div>
             </div>
         }
     </div>
