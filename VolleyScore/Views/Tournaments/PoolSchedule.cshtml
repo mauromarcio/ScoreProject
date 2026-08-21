@@ -34,16 +34,16 @@
                 padding-bottom: 9px !important;
             }
 
-            /* Score write box: small white rounded rectangle next to team name */
+            /* Score write box: taller (fills cell) and wider */
+            body.print-styled .team-cell-wrap { align-items: stretch; }
             body.print-styled .score-write-box {
-                display: inline-block !important;
-                width: 46px;
-                height: 20px;
+                display: block !important;
+                width: 92px;
+                align-self: stretch;
+                margin: 2px 0;
                 border: 1.5px solid #999;
                 border-radius: 5px;
                 background: #fff;
-                margin-left: 10px;
-                vertical-align: middle;
             }
         }
     </style>
