@@ -17,8 +17,11 @@
         .result-badge { font-size: .85rem; font-weight: 700; white-space: nowrap; }
         .ref-label    { white-space: nowrap; }
 
+        /* ── Team cell: name left, write-box right ── */
+        .team-cell-wrap { display: flex; align-items: center; justify-content: space-between; }
+
         /* ── Score write box (hidden by default; styled-print only) ── */
-        .score-write-box { display: none; }
+        .score-write-box { display: none; flex-shrink: 0; }
 
         @@media print {
             /* Hide Result column in styled-print mode */
@@ -118,11 +121,11 @@
                             <tr class="@(done ? "table-success" : live ? "table-warning" : "")">
                                 <td class="fw-semibold text-muted">M@(++matchCounter)</td>
                                 <td data-team-name="@tm.HomeTeam?.Name">
-                                    @tm.HomeTeam?.Name<span class="score-write-box"></span>
+                                    <div class="team-cell-wrap"><span>@tm.HomeTeam?.Name</span><span class="score-write-box"></span></div>
                                 </td>
                                 <td class="text-center text-muted small">vs</td>
                                 <td data-team-name="@tm.AwayTeam?.Name">
-                                    @tm.AwayTeam?.Name<span class="score-write-box"></span>
+                                    <div class="team-cell-wrap"><span>@tm.AwayTeam?.Name</span><span class="score-write-box"></span></div>
                                 </td>
                                 <td class="text-center ref-label">
                                     @if (poolMatches.Count >= 3)
@@ -182,6 +185,11 @@
         '🩵': { bg: '#64b5f6', dark: false },   // light blue
     };
 
+    // Text keyword → color fallback (checked after emoji)
+    var KEYWORD_COLORS = [
+        { keyword: 'baby blue', bg: '#90caf9', dark: false },
+    ];
+
     function applyEmojiColors() {
         document.querySelectorAll('[data-team-name]').forEach(function (td) {
             var name  = td.getAttribute('data-team-name') || '';
@@ -191,6 +199,15 @@
             if (entry) {
                 td.style.backgroundColor = entry.bg;
                 td.style.color = entry.dark ? '#fff' : '#000';
+                return;
+            }
+            var lower = name.toLowerCase();
+            for (var i = 0; i < KEYWORD_COLORS.length; i++) {
+                if (lower.indexOf(KEYWORD_COLORS[i].keyword) !== -1) {
+                    td.style.backgroundColor = KEYWORD_COLORS[i].bg;
+                    td.style.color = KEYWORD_COLORS[i].dark ? '#fff' : '#000';
+                    break;
+                }
             }
         });
     }
