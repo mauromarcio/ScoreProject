@@ -16,12 +16,7 @@
         }
         .result-badge { font-size: .85rem; font-weight: 700; white-space: nowrap; }
         .ref-label    { white-space: nowrap; }
-
-        /* ── Team cell: name left, write-box right ── */
-        .team-cell-wrap { display: flex; align-items: center; justify-content: space-between; }
-
-        /* ── Score write box (hidden by default; styled-print only) ── */
-        .score-write-box { display: none; flex-shrink: 0; }
+        .vs-col       { width: 80px; padding-left: 20px !important; padding-right: 20px !important; }
 
         @@media print {
             /* Hide Result column in styled-print mode */
@@ -32,18 +27,6 @@
             body.print-styled tbody tr th {
                 padding-top: 9px !important;
                 padding-bottom: 9px !important;
-            }
-
-            /* Score write box: taller (fills cell) and wider */
-            body.print-styled .team-cell-wrap { align-items: stretch; }
-            body.print-styled .score-write-box {
-                display: block !important;
-                width: 92px;
-                align-self: stretch;
-                margin: 2px 0;
-                border: 1.5px solid #999;
-                border-radius: 5px;
-                background: #fff;
             }
         }
     </style>
@@ -101,7 +84,7 @@
                         <tr>
                             <th style="width:52px">#</th>
                             <th>Home</th>
-                            <th style="width:36px" class="text-center">vs</th>
+                            <th class="text-center vs-col">vs</th>
                             <th>Away</th>
                             <th style="width:80px" class="text-center">
                                 <i class="bi bi-whistle me-1"></i>Ref
@@ -120,13 +103,9 @@
                             int refMNum = poolStartCounter + refIdx + 1;
                             <tr class="@(done ? "table-success" : live ? "table-warning" : "")">
                                 <td class="fw-semibold text-muted">M@(++matchCounter)</td>
-                                <td data-team-name="@tm.HomeTeam?.Name">
-                                    <div class="team-cell-wrap"><span>@tm.HomeTeam?.Name</span><span class="score-write-box"></span></div>
-                                </td>
-                                <td class="text-center text-muted small">vs</td>
-                                <td data-team-name="@tm.AwayTeam?.Name">
-                                    <div class="team-cell-wrap"><span>@tm.AwayTeam?.Name</span><span class="score-write-box"></span></div>
-                                </td>
+                                <td data-team-name="@tm.HomeTeam?.Name">@tm.HomeTeam?.Name</td>
+                                <td class="text-center text-muted small vs-col">vs</td>
+                                <td data-team-name="@tm.AwayTeam?.Name">@tm.AwayTeam?.Name</td>
                                 <td class="text-center ref-label">
                                     @if (poolMatches.Count >= 3)
                                     {
