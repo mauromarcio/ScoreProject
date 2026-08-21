@@ -303,13 +303,14 @@
                 @Model.Match.Status
             </span>
             <a asp-controller="Score" asp-action="Display" asp-route-id="@Model.Match.Id"
-               class="btn btn-dark toolbar-btn" target="_blank">
-                <i class="bi bi-display me-1"></i> Open Display Screen
+               class="btn btn-dark toolbar-btn" target="_blank"
+               title="Open Display Screen">
+                <i class="bi bi-display"></i>
             </a>
-            <button class="btn btn-outline-light toolbar-btn"
+            <button class="btn btn-dark toolbar-btn"
                     onclick="window.open('/Score/Display/' + COURT_DATA.matchId + '?mirror=1', 'volleyball-display')"
                     title="Send this match to the audience display tab (mirror mode)">
-                <i class="bi bi-arrow-repeat me-1"></i> Update Display Screen
+                <i class="bi bi-arrow-repeat me-1"></i> Cycle Display Screen
             </button>
         </div>
     </div>
