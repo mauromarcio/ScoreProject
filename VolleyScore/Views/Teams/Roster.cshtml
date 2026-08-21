@@ -1,0 +1,78 @@
+@* File: VolleyScore/Views/Teams/Roster.cshtml *@
+@model IEnumerable<VolleyScore.Models.Team>
+@{
+    ViewData["Title"] = "Team Roster";
+}
+
+@section Styles {
+    <style>
+        @@media print {
+            nav, .no-print { display: none !important; }
+            @@page { margin: 15mm; }
+            body { font-size: 11pt; }
+            .card { break-inside: avoid; page-break-inside: avoid; }
+        }
+    </style>
+}
+
+<div class="container py-4">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-4 no-print">
+        <div class="d-flex align-items-center gap-3">
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h2 class="mb-0"><i class="bi bi-journal-text me-2"></i>Team Roster</h2>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i>Print
+        </button>
+    </div>
+
+    <!-- Print-only header -->
+    <div class="d-none d-print-block mb-3">
+        <h3 class="mb-0">Team Roster</h3>
+        <small class="text-muted">Printed: @DateTime.Now.ToString("yyyy-MM-dd HH:mm")</small>
+        <hr />
+    </div>
+
+    <div class="row g-3">
+        @foreach (var team in Model)
+        {
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header fw-bold">
+                        <i class="bi bi-people-fill me-2 text-primary"></i>@team.Name
+                        <span class="badge bg-secondary fw-normal ms-2">@team.Players.Count player(s)</span>
+                    </div>
+                    @if (team.Players.Any())
+                    {
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:50px">#</th>
+                                    <th>Player Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var player in team.Players.OrderBy(p => p.Number))
+                                {
+                                    <tr>
+                                        <td class="fw-semibold text-center">@player.Number</td>
+                                        <td>@player.Name</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="card-body text-muted small">No players registered.</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+</div>

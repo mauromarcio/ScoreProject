@@ -1,0 +1,149 @@
+@* File: VolleyScore/Views/Teams/LineUps.cshtml *@
+@model IEnumerable<VolleyScore.Models.Team>
+@{
+    ViewData["Title"] = "Team Line-ups";
+    var teamList = Model.ToList();
+}
+
+@section Styles {
+    <style>
+        /* ── Screen layout ── */
+        .lineup-page {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border: 2px dashed #bbb;
+            margin-bottom: 32px;
+        }
+        .lineup-card {
+            padding: 14px 16px;
+            border: 1px dashed #bbb;
+        }
+        .lineup-card-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4px;
+        }
+        .lineup-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .9rem;
+        }
+        .lineup-table th,
+        .lineup-table td {
+            border: 1px solid #999;
+            padding: 5px 8px;
+        }
+        .lineup-table th {
+            background: #f0f0f0;
+            font-weight: 600;
+            text-align: center;
+        }
+        .lineup-table td.pos-cell { text-align: center; font-weight: 700; width: 36px; }
+        .lineup-table td.num-cell { text-align: center; width: 44px; }
+
+        /* ── Print layout ── */
+        @@media print {
+            nav, .no-print { display: none !important; }
+            @@page { margin: 8mm; size: A4 portrait; }
+            body { font-size: 10pt; }
+
+            .lineup-page {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: 1fr 1fr;
+                height: calc(100vh - 16mm);
+                page-break-after: always;
+                break-after: page;
+                margin-bottom: 0;
+                border: none;
+                gap: 0;
+            }
+            /* last page: no forced break */
+            .lineup-page:last-child {
+                page-break-after: auto;
+                break-after: auto;
+            }
+
+            .lineup-card {
+                border: none;
+                padding: 10px 14px;
+                overflow: hidden;
+            }
+            /* Dashed cut lines via borders between cards */
+            .lineup-card:nth-child(1),
+            .lineup-card:nth-child(2) { border-bottom: 1.5px dashed #666; }
+            .lineup-card:nth-child(1),
+            .lineup-card:nth-child(3) { border-right: 1.5px dashed #666; }
+
+            .lineup-card-title { font-size: 11pt; }
+            .lineup-table { font-size: 9.5pt; }
+            .lineup-table th, .lineup-table td { padding: 4px 6px; }
+        }
+    </style>
+}
+
+<div class="container-fluid py-4">
+
+    <!-- Screen header -->
+    <div class="d-flex align-items-center justify-content-between mb-4 no-print">
+        <div class="d-flex align-items-center gap-3">
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h2 class="mb-0"><i class="bi bi-layout-text-window me-2"></i>Team Line-ups</h2>
+            <small class="text-muted">4 teams per page — print and cut</small>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i>Print
+        </button>
+    </div>
+
+    <!-- Groups of 4 teams per page -->
+    @for (int pageIdx = 0; pageIdx < Math.Ceiling(teamList.Count / 4.0); pageIdx++)
+    {
+        var pageTeams = teamList.Skip(pageIdx * 4).Take(4).ToList();
+
+        <div class="lineup-page">
+            @for (int i = 0; i < 4; i++)
+            {
+                if (i < pageTeams.Count)
+                {
+                    var team = pageTeams[i];
+                    var players = team.Players.OrderBy(p => p.Number).ToList();
+                    int slots = players.Count > 4 ? 6 : 4;
+
+                    <div class="lineup-card">
+                        <div class="lineup-card-title">@team.Name</div>
+                        <table class="lineup-table">
+                            <thead>
+                                <tr>
+                                    <th>Pos</th>
+                                    <th>#</th>
+                                    <th>Player Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int slot = 1; slot <= slots; slot++)
+                                {
+                                    var player = slot <= players.Count ? players[slot - 1] : null;
+                                    <tr>
+                                        <td class="pos-cell">@slot</td>
+                                        <td class="num-cell">@(player != null ? player.Number.ToString() : "")</td>
+                                        <td>@(player?.Name ?? "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="lineup-card"></div>
+                }
+            }
+        </div>
+    }
+
+</div>

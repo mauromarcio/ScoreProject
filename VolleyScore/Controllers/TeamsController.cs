@@ -78,6 +78,26 @@ public class TeamsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // GET: Teams/Roster
+    public async Task<IActionResult> Roster()
+    {
+        var teams = await _context.Teams
+            .Include(t => t.Players.OrderBy(p => p.Number))
+            .OrderBy(t => t.Name)
+            .ToListAsync();
+        return View(teams);
+    }
+
+    // GET: Teams/LineUps
+    public async Task<IActionResult> LineUps()
+    {
+        var teams = await _context.Teams
+            .Include(t => t.Players.OrderBy(p => p.Number))
+            .OrderBy(t => t.Name)
+            .ToListAsync();
+        return View(teams);
+    }
+
     // GET: Teams/Delete/5
     public async Task<IActionResult> Delete(int id)
     {
