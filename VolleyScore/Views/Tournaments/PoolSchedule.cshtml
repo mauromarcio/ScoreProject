@@ -15,7 +15,34 @@
             body { font-size: 11pt; }
         }
         .result-badge { font-size: .85rem; font-weight: 700; white-space: nowrap; }
-        .ref-label { white-space: nowrap; }
+        .ref-label    { white-space: nowrap; }
+
+        /* ── Score write box (hidden by default; styled-print only) ── */
+        .score-write-box { display: none; }
+
+        @@media print {
+            /* Hide Result column in styled-print mode */
+            body.print-styled .result-col { display: none !important; }
+
+            /* Taller rows for styled-print readability */
+            body.print-styled tbody tr td,
+            body.print-styled tbody tr th {
+                padding-top: 9px !important;
+                padding-bottom: 9px !important;
+            }
+
+            /* Score write box: small white rounded rectangle next to team name */
+            body.print-styled .score-write-box {
+                display: inline-block !important;
+                width: 46px;
+                height: 20px;
+                border: 1.5px solid #999;
+                border-radius: 5px;
+                background: #fff;
+                margin-left: 10px;
+                vertical-align: middle;
+            }
+        }
     </style>
 }
 
@@ -32,9 +59,14 @@
                 <small class="text-muted">@Model.TournamentTeams.Count teams &nbsp;|&nbsp; @Model.SetsPerMatch set(s)/match</small>
             </div>
         </div>
-        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-            <i class="bi bi-printer me-1"></i>Print
-        </button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i>Print
+            </button>
+            <button class="btn btn-outline-primary btn-sm" onclick="printStyled()">
+                <i class="bi bi-palette me-1"></i>Print Styles
+            </button>
+        </div>
     </div>
 
     <!-- Print-only header -->
@@ -71,7 +103,7 @@
                             <th style="width:80px" class="text-center">
                                 <i class="bi bi-whistle me-1"></i>Ref
                             </th>
-                            <th style="width:90px" class="text-center">Result</th>
+                            <th style="width:90px" class="text-center result-col">Result</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -85,9 +117,13 @@
                             int refMNum = poolStartCounter + refIdx + 1;
                             <tr class="@(done ? "table-success" : live ? "table-warning" : "")">
                                 <td class="fw-semibold text-muted">M@(++matchCounter)</td>
-                                <td>@tm.HomeTeam?.Name</td>
+                                <td data-team-name="@tm.HomeTeam?.Name">
+                                    @tm.HomeTeam?.Name<span class="score-write-box"></span>
+                                </td>
                                 <td class="text-center text-muted small">vs</td>
-                                <td>@tm.AwayTeam?.Name</td>
+                                <td data-team-name="@tm.AwayTeam?.Name">
+                                    @tm.AwayTeam?.Name<span class="score-write-box"></span>
+                                </td>
                                 <td class="text-center ref-label">
                                     @if (poolMatches.Count >= 3)
                                     {
@@ -98,7 +134,7 @@
                                         <span class="text-muted">–</span>
                                     }
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center result-col">
                                     @if (done && match != null)
                                     {
                                         int h = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId);
@@ -129,3 +165,62 @@
     }
 
 </div>
+
+@section Scripts {
+<script>
+    // Map first emoji character of a team name → background + text contrast
+    var EMOJI_COLORS = {
+        '🟢': { bg: '#4caf50', dark: false },   // green
+        '🟡': { bg: '#ffeb3b', dark: false },   // yellow
+        '🔵': { bg: '#2196f3', dark: true  },   // blue
+        '⚪': { bg: '#e0e0e0', dark: false },   // white
+        '⚫': { bg: '#424242', dark: true  },   // black
+        '🟤': { bg: '#8b5e3c', dark: true  },   // brown
+        '🔴': { bg: '#e53935', dark: true  },   // red
+        '🟠': { bg: '#fb8c00', dark: false },   // orange
+        '🟣': { bg: '#8e24aa', dark: true  },   // purple
+        '🩵': { bg: '#64b5f6', dark: false },   // light blue
+    };
+
+    function applyEmojiColors() {
+        document.querySelectorAll('[data-team-name]').forEach(function (td) {
+            var name  = td.getAttribute('data-team-name') || '';
+            var first = Array.from(name)[0];
+            if (!first) return;
+            var entry = EMOJI_COLORS[first];
+            if (entry) {
+                td.style.backgroundColor = entry.bg;
+                td.style.color = entry.dark ? '#fff' : '#000';
+            }
+        });
+    }
+
+    function clearEmojiColors() {
+        document.querySelectorAll('[data-team-name]').forEach(function (td) {
+            td.style.backgroundColor = '';
+            td.style.color = '';
+        });
+    }
+
+    function printStyled() {
+        applyEmojiColors();
+        document.body.classList.add('print-styled');
+
+        var cleaned = false;
+        function cleanup() {
+            if (cleaned) return;
+            cleaned = true;
+            document.body.classList.remove('print-styled');
+            clearEmojiColors();
+        }
+
+        window.addEventListener('afterprint', function handler() {
+            cleanup();
+            window.removeEventListener('afterprint', handler);
+        });
+        setTimeout(cleanup, 8000); // fallback if afterprint never fires
+
+        window.print();
+    }
+</script>
+}
