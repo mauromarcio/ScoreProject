@@ -87,6 +87,7 @@
     <div class="lineup-grid">
         @foreach (var team in teamList)
         {
+            for (int copy = 0; copy < 2; copy++) {
             var players = team.Players.OrderBy(p => p.Number).ToList();
             int slots = players.Count > 4 ? 6 : 4;
 
@@ -177,6 +178,7 @@
                     </div>
                 </div>
             </div>
+            } // end copy loop
         }
     </div>
 
