@@ -204,15 +204,15 @@
                 </div>
                 <div class="rotate-bar">
                     <button type="button" class="btn btn-outline-secondary btn-sm"
-                            onclick="rotateTeam('@leftSide','back')"
-                            title="Rotate @leftTeam.Name back">
-                        <i class="bi bi-arrow-counterclockwise"></i>
+                            onclick="rotateTeam('@leftSide','forward')"
+                            title="Rotate @leftTeam.Name forward">
+                        <i class="bi bi-arrow-left"></i>
                     </button>
                     <span class="rotate-bar-label">@(leftTeam.Name.Length > 10 ? leftTeam.Name[..10] + "…" : leftTeam.Name)</span>
                     <button type="button" class="btn btn-outline-secondary btn-sm"
-                            onclick="rotateTeam('@leftSide','forward')"
-                            title="Rotate @leftTeam.Name forward">
-                        <i class="bi bi-arrow-clockwise"></i>
+                            onclick="rotateTeam('@leftSide','back')"
+                            title="Rotate @leftTeam.Name back">
+                        <i class="bi bi-arrow-right"></i>
                     </button>
                 </div>
             </div>
@@ -243,15 +243,15 @@
                 </div>
                 <div class="rotate-bar">
                     <button type="button" class="btn btn-outline-secondary btn-sm"
-                            onclick="rotateTeam('@rightSide','back')"
-                            title="Rotate @rightTeam.Name back">
-                        <i class="bi bi-arrow-counterclockwise"></i>
+                            onclick="rotateTeam('@rightSide','forward')"
+                            title="Rotate @rightTeam.Name forward">
+                        <i class="bi bi-arrow-left"></i>
                     </button>
                     <span class="rotate-bar-label">@(rightTeam.Name.Length > 10 ? rightTeam.Name[..10] + "…" : rightTeam.Name)</span>
                     <button type="button" class="btn btn-outline-secondary btn-sm"
-                            onclick="rotateTeam('@rightSide','forward')"
-                            title="Rotate @rightTeam.Name forward">
-                        <i class="bi bi-arrow-clockwise"></i>
+                            onclick="rotateTeam('@rightSide','back')"
+                            title="Rotate @rightTeam.Name back">
+                        <i class="bi bi-arrow-right"></i>
                     </button>
                 </div>
             </div>
