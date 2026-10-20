@@ -115,22 +115,25 @@ public class ScoreController : Controller
         bool forward = req.Direction != "back";
         int rotMod = match!.IsDoubles ? 2 : (match.IsFourPlayer ? 4 : 6);
 
+        // Teams on the right half need the position map inverted to look clockwise on screen
+        // (their court is mirrored). Base this on current visual side, not Home/Away identity,
+        // so the direction stays correct after sides are switched.
+        bool teamOnRight = req.Team == "Home" ? !match.HomeTeamOnLeft : match.HomeTeamOnLeft;
+        bool visualForward = teamOnRight ? !forward : forward;
+
         if (req.Team == "Home")
         {
             currentSet!.HomeRotationIndex = forward
                 ? (currentSet.HomeRotationIndex + 1) % rotMod
                 : (currentSet.HomeRotationIndex - 1 + rotMod) % rotMod;
-            await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, match.IsFourPlayer, forward);
+            await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, match.IsFourPlayer, visualForward);
         }
         else
         {
-            // Invert direction for Away so both teams appear to rotate clockwise on screen
-            // (mirrored court layout means same map looks counter-clockwise for Away)
-            bool awayForward = !forward;
-            currentSet!.AwayRotationIndex = awayForward
+            currentSet!.AwayRotationIndex = forward
                 ? (currentSet.AwayRotationIndex + 1) % rotMod
                 : (currentSet.AwayRotationIndex - 1 + rotMod) % rotMod;
-            await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, awayForward);
+            await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, visualForward);
         }
 
         await _context.SaveChangesAsync();
@@ -199,20 +202,19 @@ public class ScoreController : Controller
                 int rotMod = match!.IsDoubles ? 2 : (match.IsFourPlayer ? 4 : 6);
                 if (scorerIsHome)
                 {
-                    // Home team earns serve: rotate home players
                     currentSet.HomeIsServing = true;
                     currentSet.HomeRotationIndex = (currentSet.HomeRotationIndex + 1) % rotMod;
                     match.ServingTeamId = match.HomeTeamId;
-                    await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, match.IsFourPlayer);
+                    // Use forward map when home is on left half; invert when on right
+                    await RotatePlayers(match.Id, currentSet.SetNumber, "Home", currentSet.HomeRotationIndex, match.IsDoubles, match.IsFourPlayer, match.HomeTeamOnLeft);
                 }
                 else
                 {
-                    // Away team earns serve: rotate away players using inverted direction
-                    // so both sides appear clockwise on screen (mirrored layout effect)
                     currentSet.HomeIsServing = false;
-                    currentSet.AwayRotationIndex = (currentSet.AwayRotationIndex - 1 + rotMod) % rotMod;
+                    currentSet.AwayRotationIndex = (currentSet.AwayRotationIndex + 1) % rotMod;
                     match.ServingTeamId = match.AwayTeamId;
-                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, false);
+                    // Use forward map when away is on left half (home on right); invert otherwise
+                    await RotatePlayers(match.Id, currentSet.SetNumber, "Away", currentSet.AwayRotationIndex, match.IsDoubles, match.IsFourPlayer, !match.HomeTeamOnLeft);
                 }
             }
 
