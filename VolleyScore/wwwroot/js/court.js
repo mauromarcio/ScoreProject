@@ -25,11 +25,7 @@
     var isDoubles   = COURT_DATA.isDoubles === true;
     var pointsToWin = COURT_DATA.pointsToWin || 25;
 
-    // Divisor for the switch-sides cue: every N total points
-    var switchSidesEvery = pointsToWin === 11 ? 4
-                         : pointsToWin === 15 ? 5
-                         : pointsToWin === 21 ? 7
-                         : 0; // no cue for 25-pt indoor
+    var switchSidesEvery = 0; // switch-sides cue disabled
 
     // ── jQuery UI Drag & Drop ─────────────────────────────────────────────────
     function initDragDrop() {

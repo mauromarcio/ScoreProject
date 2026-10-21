@@ -1,0 +1,575 @@
+@* File: VolleyScore/Views/Live/Index.cshtml *@
+@model VolleyScore.ViewModels.LiveDataViewModel
+@{
+    Layout = "_LayoutLive";
+    ViewData["Title"] = "Live Scores";
+}
+
+@section Styles {
+<style>
+/* ── App shell ───────────────────────────────────────────────────────────── */
+.live-app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 0 80px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.live-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(15,23,42,.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    padding: 14px 16px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.live-header-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #f8fafc;
+}
+.live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse-dot 1.4s ease-in-out infinite;
+}
+@@keyframes pulse-dot {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.5; transform:scale(.7); }
+}
+.live-updated {
+    font-size: .68rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+.section-block {
+    margin: 16px 12px 0;
+}
+.section-label {
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+/* ── Live match card ─────────────────────────────────────────────────────── */
+.live-card {
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+}
+.live-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+.live-card-badge {
+    font-size: .6rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: #22c55e;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.match-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.match-team {
+    flex: 1;
+    min-width: 0;
+}
+.match-team-name {
+    font-size: .9rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.match-team-name a {
+    color: inherit;
+}
+.match-team-name a:hover { color: #93c5fd; }
+.match-team.serving .match-team-name::after {
+    content: ' ●';
+    color: #fbbf24;
+    font-size: .65rem;
+}
+.score-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.score-num {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #f8fafc;
+    min-width: 42px;
+    text-align: center;
+    line-height: 1;
+}
+.score-sep {
+    font-size: 1.4rem;
+    font-weight: 300;
+    color: #475569;
+    line-height: 1;
+}
+.set-info-mini {
+    font-size: .65rem;
+    color: #64748b;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 6px;
+    letter-spacing: .04em;
+}
+.sets-won-dots {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+}
+.set-dot-mini {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #334155;
+}
+.set-dot-mini.won { background: #22c55e; }
+
+/* ── No live matches placeholder ─────────────────────────────────────────── */
+.no-live {
+    text-align: center;
+    padding: 24px 16px;
+    background: rgba(255,255,255,.03);
+    border: 1px dashed rgba(255,255,255,.1);
+    border-radius: 12px;
+    color: #475569;
+    font-size: .85rem;
+}
+
+/* ── Standings table ─────────────────────────────────────────────────────── */
+.standings-card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+.standings-pool-label {
+    background: rgba(255,255,255,.06);
+    padding: 8px 12px;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.standings-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .8rem;
+}
+.standings-table th {
+    padding: 6px 8px;
+    font-weight: 600;
+    font-size: .65rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: #64748b;
+    background: rgba(0,0,0,.15);
+    text-align: center;
+}
+.standings-table th.name-col { text-align: left; padding-left: 12px; }
+.standings-table td {
+    padding: 9px 8px;
+    text-align: center;
+    color: #cbd5e1;
+    border-top: 1px solid rgba(255,255,255,.04);
+    font-variant-numeric: tabular-nums;
+}
+.standings-table td.name-col {
+    text-align: left;
+    padding-left: 12px;
+    font-weight: 600;
+    color: #f1f5f9;
+    max-width: 130px;
+}
+.standings-table td.name-col a { color: inherit; }
+.standings-table td.name-col a:hover { color: #93c5fd; }
+.standings-table tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+.rank-num {
+    font-size: .65rem;
+    color: #475569;
+    font-weight: 700;
+    margin-right: 4px;
+}
+.rank-1 .rank-num { color: #fbbf24; }
+.rank-2 .rank-num { color: #94a3b8; }
+.rank-3 .rank-num { color: #b45309; }
+
+/* ── Results list ────────────────────────────────────────────────────────── */
+.results-card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.result-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-top: 1px solid rgba(255,255,255,.04);
+    gap: 8px;
+}
+.result-row:first-child { border-top: none; }
+.result-team {
+    flex: 1;
+    min-width: 0;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.result-team a { color: inherit; }
+.result-team a:hover { color: #93c5fd; }
+.result-team.winner { color: #f1f5f9; font-weight: 700; }
+.result-score {
+    font-size: .9rem;
+    font-weight: 800;
+    color: #f8fafc;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.result-label {
+    font-size: .6rem;
+    color: #475569;
+    font-weight: 600;
+    text-align: right;
+    flex-shrink: 0;
+    max-width: 70px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.live-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(15,23,42,.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,.06);
+    padding: 10px 16px;
+    text-align: center;
+    font-size: .65rem;
+    color: #475569;
+    font-weight: 500;
+    letter-spacing: .04em;
+}
+
+/* ── Tournament header ───────────────────────────────────────────────────── */
+.tournament-header {
+    font-size: .78rem;
+    font-weight: 700;
+    color: #7dd3fc;
+    letter-spacing: .04em;
+    padding: 0 4px;
+    margin: 20px 0 6px;
+}
+.tournament-header:first-child { margin-top: 0; }
+</style>
+}
+
+<div class="live-app">
+
+    <!-- Header -->
+    <div class="live-header">
+        <div class="live-header-title">
+            <span class="live-dot"></span>Live Scores
+        </div>
+        <div class="live-updated" id="updatedAt">
+            Updated @Model.GeneratedAt.ToString("HH:mm:ss")
+        </div>
+    </div>
+
+    <!-- ── LIVE NOW ──────────────────────────────────────────────────────── -->
+    <div class="section-block">
+        <div class="section-label"><i class="bi bi-broadcast me-1"></i>Live Now</div>
+
+        @if (!Model.LiveMatches.Any())
+        {
+            <div class="no-live">
+                <i class="bi bi-hourglass-split" style="font-size:1.5rem;display:block;margin-bottom:6px"></i>
+                No matches in progress
+            </div>
+        }
+        else
+        {
+            @foreach (var m in Model.LiveMatches)
+            {
+                var currentSet = m.Sets.FirstOrDefault(s => s.SetNumber == m.CurrentSetNumber);
+                int homeScore = currentSet?.HomeScore ?? 0;
+                int awayScore = currentSet?.AwayScore ?? 0;
+                int homeSets  = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                int awaySets  = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                bool homeServing = m.ServingTeamId == m.HomeTeamId;
+                int setsToWin = (m.TotalSets / 2) + 1;
+                <div class="live-card" id="live-match-@m.Id">
+                    <div class="live-card-badge">
+                        <span class="live-dot" style="width:6px;height:6px"></span>
+                        Live · Set @m.CurrentSetNumber of @m.TotalSets
+                    </div>
+                    <div class="match-row">
+                        <div class="match-team @(homeServing ? "serving" : "")">
+                            <div class="match-team-name">
+                                <a href="/Live/Team/@m.HomeTeamId">@m.HomeTeam?.Name</a>
+                            </div>
+                            <div class="sets-won-dots" id="home-sets-@m.Id">
+                                @for (int i = 0; i < setsToWin; i++)
+                                {
+                                    <span class="set-dot-mini @(i < homeSets ? "won" : "")"></span>
+                                }
+                            </div>
+                        </div>
+                        <div class="score-box">
+                            <div class="score-num" id="home-score-@m.Id">@homeScore</div>
+                            <div class="score-sep">–</div>
+                            <div class="score-num" id="away-score-@m.Id">@awayScore</div>
+                        </div>
+                        <div class="match-team @(!homeServing ? "serving" : "")" style="text-align:right">
+                            <div class="match-team-name" style="text-align:right">
+                                <a href="/Live/Team/@m.AwayTeamId">@m.AwayTeam?.Name</a>
+                            </div>
+                            <div class="sets-won-dots" style="justify-content:flex-end" id="away-sets-@m.Id">
+                                @for (int i = 0; i < setsToWin; i++)
+                                {
+                                    <span class="set-dot-mini @(i < awaySets ? "won" : "")"></span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- ── POOL STANDINGS ───────────────────────────────────────────────── -->
+    @foreach (var ts in Model.TournamentStandings)
+    {
+        if (!ts.PoolStandings.Any()) { continue; }
+        <div class="section-block">
+            <div class="section-label"><i class="bi bi-table me-1"></i>Pool Standings</div>
+            <div class="tournament-header">@ts.TournamentName</div>
+
+            @foreach (var ps in ts.PoolStandings)
+            {
+                if (!ps.Standings.Any()) { continue; }
+                <div class="standings-card">
+                    <div class="standings-pool-label">@ps.PoolName</div>
+                    <table class="standings-table">
+                        <thead>
+                            <tr>
+                                <th class="name-col">Team</th>
+                                <th>MP</th>
+                                <th>W</th>
+                                <th>L</th>
+                                <th>SW</th>
+                                <th>SL</th>
+                                <th>Pts±</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int ri = 0; ri < ps.Standings.Count; ri++)
+                            {
+                                var s = ps.Standings[ri];
+                                var rankClass = ri == 0 ? "rank-1" : ri == 1 ? "rank-2" : ri == 2 ? "rank-3" : "";
+                                <tr class="@rankClass">
+                                    <td class="name-col">
+                                        <span class="rank-num">@(ri + 1)</span>
+                                        <a href="/Live/Team/@s.TeamId">@s.TeamName</a>
+                                    </td>
+                                    <td>@s.MatchesPlayed</td>
+                                    <td>@s.MatchesWon</td>
+                                    <td>@s.MatchesLost</td>
+                                    <td>@s.SetsWon</td>
+                                    <td>@s.SetsLost</td>
+                                    <td>@(s.PointsMade - s.PointsAgainst > 0 ? "+" : "")@(s.PointsMade - s.PointsAgainst)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (ts.OverallStandings.Count > 1)
+            {
+                <div class="section-label" style="margin-top:14px"><i class="bi bi-trophy me-1"></i>Overall</div>
+                <div class="standings-card">
+                    <table class="standings-table">
+                        <thead>
+                            <tr>
+                                <th class="name-col">Team</th>
+                                <th>MP</th>
+                                <th>W</th>
+                                <th>L</th>
+                                <th>SW</th>
+                                <th>SL</th>
+                                <th>Pts±</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (int ri = 0; ri < ts.OverallStandings.Count; ri++)
+                            {
+                                var s = ts.OverallStandings[ri];
+                                var rankClass = ri == 0 ? "rank-1" : ri == 1 ? "rank-2" : ri == 2 ? "rank-3" : "";
+                                <tr class="@rankClass">
+                                    <td class="name-col">
+                                        <span class="rank-num">@(ri + 1)</span>
+                                        <a href="/Live/Team/@s.TeamId">@s.TeamName</a>
+                                    </td>
+                                    <td>@s.MatchesPlayed</td>
+                                    <td>@s.MatchesWon</td>
+                                    <td>@s.MatchesLost</td>
+                                    <td>@s.SetsWon</td>
+                                    <td>@s.SetsLost</td>
+                                    <td>@(s.PointsMade - s.PointsAgainst > 0 ? "+" : "")@(s.PointsMade - s.PointsAgainst)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- ── COMPLETED RESULTS ─────────────────────────────────────────────── -->
+    @if (Model.CompletedResults.Any())
+    {
+        <div class="section-block">
+            <div class="section-label"><i class="bi bi-check-circle me-1"></i>Results</div>
+            <div class="results-card" id="resultsContainer">
+                @foreach (var r in Model.CompletedResults.Take(20))
+                {
+                    bool homeWon = r.HomeSets > r.AwaySets;
+                    <div class="result-row">
+                        <div class="result-team @(homeWon ? "winner" : "")">
+                            <a href="/Live/Team/@r.HomeTeamId">@r.HomeTeamName</a>
+                        </div>
+                        <div class="result-score">@r.HomeSets – @r.AwaySets</div>
+                        <div class="result-team @(!homeWon ? "winner" : "")" style="text-align:right">
+                            <a href="/Live/Team/@r.AwayTeamId">@r.AwayTeamName</a>
+                        </div>
+                        <div class="result-label">@r.Label</div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+</div>
+
+<div class="live-footer">
+    LIVE SCORES · Auto-updates every 30s · Read only
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // ── SignalR: join all live match groups for real-time score pushes ────────
+    var liveMatchIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.LiveMatches.Select(m => m.Id).ToList()));
+
+    var connection = new signalR.HubConnectionBuilder()
+        .withUrl('/scoreHub')
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on('ScoreUpdated', function (data) {
+        if (!data) return;
+        var matchId = data.matchId;
+
+        // Update scores
+        var homeEl = document.getElementById('home-score-' + matchId);
+        var awayEl = document.getElementById('away-score-' + matchId);
+        if (homeEl) homeEl.textContent = data.homeScore ?? homeEl.textContent;
+        if (awayEl) awayEl.textContent = data.awayScore ?? awayEl.textContent;
+
+        // Update set dots
+        updateSetDots('home-sets-' + matchId, data.homeSetsWon, data.totalSets);
+        updateSetDots('away-sets-' + matchId, data.awaySetsWon, data.totalSets);
+
+        // Serving indicator
+        var card = document.getElementById('live-match-' + matchId);
+        if (card) {
+            var rows = card.querySelectorAll('.match-team');
+            if (rows.length === 2) {
+                rows[0].classList.toggle('serving', !!data.homeIsServing);
+                rows[1].classList.toggle('serving', !data.homeIsServing);
+            }
+        }
+
+        // If match completed, reload standings section after a short delay
+        if (data.matchCompleted) {
+            setTimeout(refreshStandings, 1500);
+        }
+    });
+
+    function updateSetDots(containerId, setsWon, totalSets) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        var dots = container.querySelectorAll('.set-dot-mini');
+        dots.forEach(function (dot, i) {
+            dot.classList.toggle('won', i < setsWon);
+        });
+    }
+
+    connection.start().then(function () {
+        liveMatchIds.forEach(function (id) {
+            connection.invoke('JoinMatchGroup', id).catch(console.error);
+        });
+    }).catch(console.error);
+
+    // ── Poll /Live/Data every 30s to refresh standings/results ───────────────
+    function refreshStandings() {
+        fetch('/Live/Data')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                document.getElementById('updatedAt').textContent =
+                    'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            })
+            .catch(console.error);
+    }
+
+    setInterval(refreshStandings, 30000);
+})();
+</script>
+}

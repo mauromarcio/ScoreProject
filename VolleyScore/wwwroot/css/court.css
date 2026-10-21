@@ -8,6 +8,7 @@
     height: calc(100vh - 56px); /* subtract navbar */
     overflow: hidden;
     background: #f0f2f5;
+    position: relative;
 }
 
 /* ── Switch-sides cue (Doubles) ──────────────────────────────────────────── */

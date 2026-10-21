@@ -149,6 +149,13 @@
         </div>
     </div>
 
+    <!-- ── QR code (top-right, links to live display) ───────────────────── -->
+    <div id="liveQrBox" style="position:absolute;top:8px;right:12px;z-index:100;text-align:center;cursor:pointer"
+         onclick="window.open('/Live','_blank')" title="Open Live Score Screen">
+        <div id="liveQrCode"></div>
+        <div style="font-size:.6rem;font-weight:700;color:#555;margin-top:2px;letter-spacing:.04em">LIVE SCORES</div>
+    </div>
+
     <!-- ── Switch-sides cue ──────────────────────────────────────────────── -->
     <div id="switchSidesCue" class="switch-sides-cue" style="display:none">
         <i class="bi bi-arrow-left-right me-1"></i>Switch Sides
@@ -361,4 +368,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"
             crossorigin="anonymous"></script>
     <script src="~/js/court.js" asp-append-version="true"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+            crossorigin="anonymous"></script>
+    <script>
+        (function () {
+            var liveUrl = window.location.protocol + '//' + window.location.host + '/Live';
+            new QRCode(document.getElementById('liveQrCode'), {
+                text: liveUrl,
+                width: 88,
+                height: 88,
+                colorDark: '#111',
+                colorLight: '#fff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        })();
+    </script>
 }

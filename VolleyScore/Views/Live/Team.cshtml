@@ -1,0 +1,241 @@
+@* File: VolleyScore/Views/Live/Team.cshtml *@
+@using VolleyScore.Models
+@{
+    Layout = "_LayoutLive";
+    var team = (Team)ViewBag.Team;
+    var appearances = (List<TournamentMatch>)ViewBag.Appearances;
+    ViewData["Title"] = team.Name;
+
+    // Aggregate stats across all appearances
+    int mp = 0, mw = 0, ml = 0, sw = 0, sl = 0, pf = 0, pa = 0;
+    foreach (var tm in appearances.Where(a => a.Match?.Status != MatchStatus.Setup))
+    {
+        var m = tm.Match!;
+        bool isHome = m.HomeTeamId == team.Id;
+        int hs = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+        int as2 = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+        int hpts = m.Sets.Sum(s => s.HomeScore);
+        int apts = m.Sets.Sum(s => s.AwayScore);
+        mp++;
+        if (isHome) { sw += hs; sl += as2; pf += hpts; pa += apts; }
+        else        { sw += as2; sl += hs; pf += apts; pa += hpts; }
+        if (m.Status == MatchStatus.Completed)
+        {
+            int tw = isHome ? hs : as2;
+            int tl = isHome ? as2 : hs;
+            if (tw > tl) mw++; else if (tl > tw) ml++;
+        }
+    }
+
+    // Group by tournament
+    var byTournament = appearances
+        .GroupBy(tm => tm.TournamentId)
+        .Select(g => new {
+            Tournament = g.First().Tournament,
+            Matches = g.Where(tm => tm.Match != null).OrderBy(tm => tm.SortOrder).ToList()
+        })
+        .ToList();
+}
+
+@section Styles {
+<style>
+.team-page { max-width: 480px; margin: 0 auto; padding: 0 0 40px; }
+.back-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    background: rgba(15,23,42,.85);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(10px);
+}
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #7dd3fc;
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid rgba(125,211,252,.3);
+    border-radius: 20px;
+}
+.back-btn:hover { background: rgba(125,211,252,.08); color: #7dd3fc; }
+.team-name-hero {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #f8fafc;
+    padding: 20px 16px 6px;
+    line-height: 1.1;
+}
+.stat-strip {
+    display: flex;
+    gap: 0;
+    padding: 0 16px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.stat-pill {
+    flex: 1;
+    text-align: center;
+    padding: 10px 4px;
+    border-right: 1px solid rgba(255,255,255,.06);
+}
+.stat-pill:last-child { border-right: none; }
+.stat-val {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #f1f5f9;
+    line-height: 1;
+}
+.stat-label {
+    font-size: .6rem;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-top: 3px;
+}
+.green { color: #22c55e; }
+.red   { color: #f87171; }
+
+.section-pad { padding: 16px 16px 0; }
+.section-title {
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 10px;
+}
+.match-result-card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.mr-teams {
+    flex: 1;
+    min-width: 0;
+}
+.mr-home { font-size: .85rem; font-weight: 700; color: #f1f5f9; }
+.mr-vs   { font-size: .68rem; color: #64748b; margin: 1px 0; }
+.mr-away { font-size: .85rem; font-weight: 600; color: #cbd5e1; }
+.mr-score {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: #f8fafc;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.mr-outcome {
+    font-size: .65rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+.outcome-w { background: rgba(34,197,94,.15); color: #22c55e; border: 1px solid rgba(34,197,94,.3); }
+.outcome-l { background: rgba(248,113,113,.1); color: #f87171; border: 1px solid rgba(248,113,113,.25); }
+.outcome-live { background: rgba(251,191,36,.12); color: #fbbf24; border: 1px solid rgba(251,191,36,.3); }
+.outcome-ns   { background: rgba(148,163,184,.08); color: #64748b; border: 1px solid rgba(148,163,184,.15); }
+.tournament-label {
+    font-size: .7rem;
+    font-weight: 700;
+    color: #7dd3fc;
+    letter-spacing: .04em;
+    margin: 18px 0 8px;
+}
+.tournament-label:first-child { margin-top: 0; }
+</style>
+}
+
+<div class="team-page">
+
+    <div class="back-bar">
+        <a href="/Live" class="back-btn"><i class="bi bi-arrow-left"></i> Back</a>
+        <span style="font-size:.8rem;font-weight:600;color:#94a3b8">Team Stats</span>
+    </div>
+
+    <div class="team-name-hero">@team.Name</div>
+
+    <!-- Stats strip -->
+    <div class="stat-strip">
+        <div class="stat-pill">
+            <div class="stat-val">@mp</div>
+            <div class="stat-label">Played</div>
+        </div>
+        <div class="stat-pill">
+            <div class="stat-val green">@mw</div>
+            <div class="stat-label">Won</div>
+        </div>
+        <div class="stat-pill">
+            <div class="stat-val red">@ml</div>
+            <div class="stat-label">Lost</div>
+        </div>
+        <div class="stat-pill">
+            <div class="stat-val">@sw</div>
+            <div class="stat-label">S.Won</div>
+        </div>
+        <div class="stat-pill">
+            <div class="stat-val">@sl</div>
+            <div class="stat-label">S.Lost</div>
+        </div>
+        <div class="stat-pill">
+            <div class="stat-val @(pf - pa > 0 ? "green" : pf - pa < 0 ? "red" : "")">
+                @(pf - pa > 0 ? "+" : "")@(pf - pa)
+            </div>
+            <div class="stat-label">Pts±</div>
+        </div>
+    </div>
+
+    <!-- Match history -->
+    <div class="section-pad">
+        <div class="section-title">Match History</div>
+
+        @if (!appearances.Any())
+        {
+            <div style="color:#64748b;font-size:.85rem;text-align:center;padding:20px">No matches yet</div>
+        }
+        else
+        {
+            @foreach (var grp in byTournament)
+            {
+                <div class="tournament-label">@grp.Tournament?.Name</div>
+                @foreach (var tm in grp.Matches)
+                {
+                    var m = tm.Match!;
+                    bool isHome = m.HomeTeamId == team.Id;
+                    int teamSets  = isHome ? m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId) : m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                    int oppSets   = isHome ? m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId) : m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                    var opp       = isHome ? m.AwayTeam : m.HomeTeam;
+                    bool won = teamSets > oppSets;
+                    bool lost = oppSets > teamSets;
+                    string outcomeClass = m.Status == MatchStatus.Completed
+                        ? (won ? "outcome-w" : "outcome-l")
+                        : m.Status == MatchStatus.InProgress ? "outcome-live" : "outcome-ns";
+                    string outcomeLabel = m.Status == MatchStatus.Completed
+                        ? (won ? "W" : "L")
+                        : m.Status == MatchStatus.InProgress ? "Live" : "–";
+                    <div class="match-result-card">
+                        <div class="mr-teams">
+                            <div class="mr-home">@team.Name</div>
+                            <div class="mr-vs">vs</div>
+                            <div class="mr-away">@(opp?.Name ?? "TBD")</div>
+                        </div>
+                        <div class="mr-score">@teamSets – @oppSets</div>
+                        <div class="mr-outcome @outcomeClass">@outcomeLabel</div>
+                    </div>
+                }
+            }
+        }
+    </div>
+
+</div>
