@@ -101,8 +101,9 @@ public class LiveController : Controller
             });
         }
 
-        // Completed match results
+        // Completed match results — only for tournaments where ShowResultsOnLive is enabled
         var completedResults = tournaments
+            .Where(t => t.ShowResultsOnLive)
             .SelectMany(t => t.TournamentMatches)
             .Where(tm => tm.Match?.Status == MatchStatus.Completed)
             .OrderByDescending(tm => tm.SortOrder)

@@ -406,6 +406,7 @@
                                 <th>SW</th>
                                 <th>SL</th>
                                 <th>Pts±</th>
+                                <th>Ratio</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -424,6 +425,7 @@
                                     <td>@s.SetsWon</td>
                                     <td>@s.SetsLost</td>
                                     <td>@(s.PointsMade - s.PointsAgainst > 0 ? "+" : "")@(s.PointsMade - s.PointsAgainst)</td>
+                                    <td>@(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" : s.PointsRatio == double.MaxValue ? "∞" : s.PointsRatio.ToString("F2"))</td>
                                 </tr>
                             }
                         </tbody>
@@ -445,6 +447,7 @@
                                 <th>SW</th>
                                 <th>SL</th>
                                 <th>Pts±</th>
+                                <th>Ratio</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -463,6 +466,7 @@
                                     <td>@s.SetsWon</td>
                                     <td>@s.SetsLost</td>
                                     <td>@(s.PointsMade - s.PointsAgainst > 0 ? "+" : "")@(s.PointsMade - s.PointsAgainst)</td>
+                                    <td>@(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" : s.PointsRatio == double.MaxValue ? "∞" : s.PointsRatio.ToString("F2"))</td>
                                 </tr>
                             }
                         </tbody>

@@ -863,6 +863,18 @@ public class TournamentsController : Controller
         return fromWinner ? winnerId : loserId;
     }
 
+    // ── Toggle live results visibility ────────────────────────────────────────
+
+    [HttpPost]
+    public async Task<IActionResult> ToggleLiveResults(int id)
+    {
+        var tournament = await _context.Tournaments.FindAsync(id);
+        if (tournament == null) return NotFound();
+        tournament.ShowResultsOnLive = !tournament.ShowResultsOnLive;
+        await _context.SaveChangesAsync();
+        return Json(new { showResultsOnLive = tournament.ShowResultsOnLive });
+    }
+
     // ── Delete tournament ─────────────────────────────────────────────────────
 
     [HttpPost]

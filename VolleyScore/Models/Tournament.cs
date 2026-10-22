@@ -85,6 +85,9 @@ public class Tournament
     [Range(0, 99)]
     public int FinalPointsCap { get; set; } = 0;
 
+    /// <summary>When false, completed match results are hidden on the /Live public screen.</summary>
+    public bool ShowResultsOnLive { get; set; } = true;
+
     // Navigation
     public ICollection<TournamentTeam> TournamentTeams { get; set; } = new List<TournamentTeam>();
     public ICollection<Pool> Pools { get; set; } = new List<Pool>();
