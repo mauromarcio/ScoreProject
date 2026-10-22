@@ -57,7 +57,7 @@ public class LiveController : Controller
     private async Task<LiveDataViewModel> BuildLiveData()
     {
         var tournaments = await _context.Tournaments
-            .Where(t => t.Status != TournamentStatus.Setup)
+            .Where(t => t.Status != TournamentStatus.Setup && t.ShowResultsOnLive)
             .Include(t => t.TournamentTeams).ThenInclude(tt => tt.Team)
             .Include(t => t.Pools).ThenInclude(p => p.PoolTeams)
                 .ThenInclude(pt => pt.TournamentTeam).ThenInclude(tt => tt!.Team)

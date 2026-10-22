@@ -383,127 +383,91 @@
         }
     </div>
 
-    <!-- ── POOL STANDINGS ───────────────────────────────────────────────── -->
-    @foreach (var ts in Model.TournamentStandings)
-    {
-        if (!ts.PoolStandings.Any()) { continue; }
-        <div class="section-block">
-            <div class="section-label"><i class="bi bi-table me-1"></i>Pool Standings</div>
-            <div class="tournament-header">@ts.TournamentName</div>
+    <!-- ── DYNAMIC: Pool Standings + Results (auto-refreshed every 60s) ──── -->
+    <div id="dynamicContent">
 
-            @foreach (var ps in ts.PoolStandings)
-            {
-                if (!ps.Standings.Any()) { continue; }
-                <div class="standings-card">
-                    <div class="standings-pool-label">@ps.PoolName</div>
-                    <table class="standings-table">
-                        <thead>
-                            <tr>
-                                <th class="name-col">Team</th>
-                                <th>MP</th>
-                                <th>W</th>
-                                <th>L</th>
-                                <th>SW</th>
-                                <th>SL</th>
-                                <th>Pts±</th>
-                                <th>Ratio</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (int ri = 0; ri < ps.Standings.Count; ri++)
-                            {
-                                var s = ps.Standings[ri];
-                                var rankClass = ri == 0 ? "rank-1" : ri == 1 ? "rank-2" : ri == 2 ? "rank-3" : "";
-                                <tr class="@rankClass">
-                                    <td class="name-col">
-                                        <span class="rank-num">@(ri + 1)</span>
-                                        <a href="/Live/Team/@s.TeamId">@s.TeamName</a>
-                                    </td>
-                                    <td>@s.MatchesPlayed</td>
-                                    <td>@s.MatchesWon</td>
-                                    <td>@s.MatchesLost</td>
-                                    <td>@s.SetsWon</td>
-                                    <td>@s.SetsLost</td>
-                                    <td>@(s.PointsMade - s.PointsAgainst > 0 ? "+" : "")@(s.PointsMade - s.PointsAgainst)</td>
-                                    <td>@(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" : s.PointsRatio == double.MaxValue ? "∞" : s.PointsRatio.ToString("F2"))</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
+        <!-- ── POOL STANDINGS ─────────────────────────────────────────────── -->
+        @foreach (var ts in Model.TournamentStandings)
+        {
+            if (!ts.PoolStandings.Any()) { continue; }
+            <div class="section-block">
+                <div class="section-label"><i class="bi bi-table me-1"></i>Pool Standings</div>
+                <div class="tournament-header">@ts.TournamentName</div>
 
-            @if (ts.OverallStandings.Count > 1)
-            {
-                <div class="section-label" style="margin-top:14px"><i class="bi bi-trophy me-1"></i>Overall</div>
-                <div class="standings-card">
-                    <table class="standings-table">
-                        <thead>
-                            <tr>
-                                <th class="name-col">Team</th>
-                                <th>MP</th>
-                                <th>W</th>
-                                <th>L</th>
-                                <th>SW</th>
-                                <th>SL</th>
-                                <th>Pts±</th>
-                                <th>Ratio</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (int ri = 0; ri < ts.OverallStandings.Count; ri++)
-                            {
-                                var s = ts.OverallStandings[ri];
-                                var rankClass = ri == 0 ? "rank-1" : ri == 1 ? "rank-2" : ri == 2 ? "rank-3" : "";
-                                <tr class="@rankClass">
-                                    <td class="name-col">
-                                        <span class="rank-num">@(ri + 1)</span>
-                                        <a href="/Live/Team/@s.TeamId">@s.TeamName</a>
-                                    </td>
-                                    <td>@s.MatchesPlayed</td>
-                                    <td>@s.MatchesWon</td>
-                                    <td>@s.MatchesLost</td>
-                                    <td>@s.SetsWon</td>
-                                    <td>@s.SetsLost</td>
-                                    <td>@(s.PointsMade - s.PointsAgainst > 0 ? "+" : "")@(s.PointsMade - s.PointsAgainst)</td>
-                                    <td>@(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" : s.PointsRatio == double.MaxValue ? "∞" : s.PointsRatio.ToString("F2"))</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
-    }
-
-    <!-- ── COMPLETED RESULTS ─────────────────────────────────────────────── -->
-    @if (Model.CompletedResults.Any())
-    {
-        <div class="section-block">
-            <div class="section-label"><i class="bi bi-check-circle me-1"></i>Results</div>
-            <div class="results-card" id="resultsContainer">
-                @foreach (var r in Model.CompletedResults.Take(20))
+                @foreach (var ps in ts.PoolStandings)
                 {
-                    bool homeWon = r.HomeSets > r.AwaySets;
-                    <div class="result-row">
-                        <div class="result-team @(homeWon ? "winner" : "")">
-                            <a href="/Live/Team/@r.HomeTeamId">@r.HomeTeamName</a>
-                        </div>
-                        <div class="result-score">@r.HomeSets – @r.AwaySets</div>
-                        <div class="result-team @(!homeWon ? "winner" : "")" style="text-align:right">
-                            <a href="/Live/Team/@r.AwayTeamId">@r.AwayTeamName</a>
-                        </div>
-                        <div class="result-label">@r.Label</div>
+                    if (!ps.Standings.Any()) { continue; }
+                    <div class="standings-card">
+                        <div class="standings-pool-label">@ps.PoolName</div>
+                        <table class="standings-table">
+                            <thead>
+                                <tr>
+                                    <th class="name-col">Team</th>
+                                    <th>MP</th>
+                                    <th>W</th>
+                                    <th>L</th>
+                                    <th>SW</th>
+                                    <th>SL</th>
+                                    <th>Pts±</th>
+                                    <th>Ratio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int ri = 0; ri < ps.Standings.Count; ri++)
+                                {
+                                    var s = ps.Standings[ri];
+                                    var rankClass = ri == 0 ? "rank-1" : ri == 1 ? "rank-2" : ri == 2 ? "rank-3" : "";
+                                    <tr class="@rankClass">
+                                        <td class="name-col">
+                                            <span class="rank-num">@(ri + 1)</span>
+                                            <a href="/Live/Team/@s.TeamId">@s.TeamName</a>
+                                        </td>
+                                        <td>@s.MatchesPlayed</td>
+                                        <td>@s.MatchesWon</td>
+                                        <td>@s.MatchesLost</td>
+                                        <td>@s.SetsWon</td>
+                                        <td>@s.SetsLost</td>
+                                        <td>@(s.PointsMade - s.PointsAgainst > 0 ? "+" : "")@(s.PointsMade - s.PointsAgainst)</td>
+                                        <td>@(s.PointsAgainst == 0 && s.PointsMade == 0 ? "–" : s.PointsRatio == double.MaxValue ? "∞" : s.PointsRatio.ToString("F2"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     </div>
                 }
             </div>
-        </div>
-    }
+        }
+
+        <!-- ── COMPLETED RESULTS ──────────────────────────────────────────── -->
+        @if (Model.CompletedResults.Any())
+        {
+            <div class="section-block">
+                <div class="section-label"><i class="bi bi-check-circle me-1"></i>Results</div>
+                <div class="results-card">
+                    @foreach (var r in Model.CompletedResults.Take(20))
+                    {
+                        bool homeWon = r.HomeSets > r.AwaySets;
+                        <div class="result-row">
+                            <div class="result-team @(homeWon ? "winner" : "")">
+                                <a href="/Live/Team/@r.HomeTeamId">@r.HomeTeamName</a>
+                            </div>
+                            <div class="result-score">@r.HomeSets – @r.AwaySets</div>
+                            <div class="result-team @(!homeWon ? "winner" : "")" style="text-align:right">
+                                <a href="/Live/Team/@r.AwayTeamId">@r.AwayTeamName</a>
+                            </div>
+                            <div class="result-label">@r.Label</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+    </div><!-- /#dynamicContent -->
 
 </div>
 
 <div class="live-footer">
-    LIVE SCORES · Auto-updates every 30s · Read only
+    LIVE SCORES · Auto-updates every 60s · Read only
 </div>
 
 @section Scripts {
@@ -543,7 +507,7 @@
 
         // If match completed, reload standings section after a short delay
         if (data.matchCompleted) {
-            setTimeout(refreshStandings, 1500);
+            setTimeout(refreshContent, 1500);
         }
     });
 
@@ -562,18 +526,24 @@
         });
     }).catch(console.error);
 
-    // ── Poll /Live/Data every 30s to refresh standings/results ───────────────
-    function refreshStandings() {
-        fetch('/Live/Data')
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
+    // ── DOM-swap refresh: fetch /Live every 60s, replace standings/results ────
+    function refreshContent() {
+        fetch('/Live')
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var newContent = doc.getElementById('dynamicContent');
+                var curContent = document.getElementById('dynamicContent');
+                if (newContent && curContent) {
+                    curContent.innerHTML = newContent.innerHTML;
+                }
                 document.getElementById('updatedAt').textContent =
                     'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             })
             .catch(console.error);
     }
 
-    setInterval(refreshStandings, 30000);
+    setInterval(refreshContent, 60000);
 })();
 </script>
 }
