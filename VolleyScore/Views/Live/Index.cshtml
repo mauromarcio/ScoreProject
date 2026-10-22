@@ -322,69 +322,69 @@
         </div>
     </div>
 
-    <!-- ── LIVE NOW ──────────────────────────────────────────────────────── -->
-    <div class="section-block">
-        <div class="section-label"><i class="bi bi-broadcast me-1"></i>Live Now</div>
+    <!-- ── DYNAMIC: Live Now + Pool Standings + Results (auto-refreshed) ──── -->
+    <div id="dynamicContent">
 
-        @if (!Model.LiveMatches.Any())
-        {
-            <div class="no-live">
-                <i class="bi bi-hourglass-split" style="font-size:1.5rem;display:block;margin-bottom:6px"></i>
-                No matches in progress
-            </div>
-        }
-        else
-        {
-            @foreach (var m in Model.LiveMatches)
+        <!-- ── LIVE NOW ────────────────────────────────────────────────────── -->
+        <div class="section-block">
+            <div class="section-label"><i class="bi bi-broadcast me-1"></i>Live Now</div>
+
+            @if (!Model.LiveMatches.Any())
             {
-                var currentSet = m.Sets.FirstOrDefault(s => s.SetNumber == m.CurrentSetNumber);
-                int homeScore = currentSet?.HomeScore ?? 0;
-                int awayScore = currentSet?.AwayScore ?? 0;
-                int homeSets  = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
-                int awaySets  = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
-                bool homeServing = m.ServingTeamId == m.HomeTeamId;
-                int setsToWin = (m.TotalSets / 2) + 1;
-                <div class="live-card" id="live-match-@m.Id">
-                    <div class="live-card-badge">
-                        <span class="live-dot" style="width:6px;height:6px"></span>
-                        Live · Set @m.CurrentSetNumber of @m.TotalSets
-                    </div>
-                    <div class="match-row">
-                        <div class="match-team @(homeServing ? "serving" : "")">
-                            <div class="match-team-name">
-                                <a href="/Live/Team/@m.HomeTeamId">@m.HomeTeam?.Name</a>
-                            </div>
-                            <div class="sets-won-dots" id="home-sets-@m.Id">
-                                @for (int i = 0; i < setsToWin; i++)
-                                {
-                                    <span class="set-dot-mini @(i < homeSets ? "won" : "")"></span>
-                                }
-                            </div>
-                        </div>
-                        <div class="score-box">
-                            <div class="score-num" id="home-score-@m.Id">@homeScore</div>
-                            <div class="score-sep">–</div>
-                            <div class="score-num" id="away-score-@m.Id">@awayScore</div>
-                        </div>
-                        <div class="match-team @(!homeServing ? "serving" : "")" style="text-align:right">
-                            <div class="match-team-name" style="text-align:right">
-                                <a href="/Live/Team/@m.AwayTeamId">@m.AwayTeam?.Name</a>
-                            </div>
-                            <div class="sets-won-dots" style="justify-content:flex-end" id="away-sets-@m.Id">
-                                @for (int i = 0; i < setsToWin; i++)
-                                {
-                                    <span class="set-dot-mini @(i < awaySets ? "won" : "")"></span>
-                                }
-                            </div>
-                        </div>
-                    </div>
+                <div class="no-live">
+                    <i class="bi bi-hourglass-split" style="font-size:1.5rem;display:block;margin-bottom:6px"></i>
+                    No matches in progress
                 </div>
             }
-        }
-    </div>
-
-    <!-- ── DYNAMIC: Pool Standings + Results (auto-refreshed every 60s) ──── -->
-    <div id="dynamicContent">
+            else
+            {
+                @foreach (var m in Model.LiveMatches)
+                {
+                    var currentSet = m.Sets.FirstOrDefault(s => s.SetNumber == m.CurrentSetNumber);
+                    int homeScore = currentSet?.HomeScore ?? 0;
+                    int awayScore = currentSet?.AwayScore ?? 0;
+                    int homeSets  = m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
+                    int awaySets  = m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
+                    bool homeServing = m.ServingTeamId == m.HomeTeamId;
+                    int setsToWin = (m.TotalSets / 2) + 1;
+                    <div class="live-card" id="live-match-@m.Id">
+                        <div class="live-card-badge">
+                            <span class="live-dot" style="width:6px;height:6px"></span>
+                            Live · Set @m.CurrentSetNumber of @m.TotalSets
+                        </div>
+                        <div class="match-row">
+                            <div class="match-team @(homeServing ? "serving" : "")">
+                                <div class="match-team-name">
+                                    <a href="/Live/Team/@m.HomeTeamId">@m.HomeTeam?.Name</a>
+                                </div>
+                                <div class="sets-won-dots" id="home-sets-@m.Id">
+                                    @for (int i = 0; i < setsToWin; i++)
+                                    {
+                                        <span class="set-dot-mini @(i < homeSets ? "won" : "")"></span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="score-box">
+                                <div class="score-num" id="home-score-@m.Id">@homeScore</div>
+                                <div class="score-sep">–</div>
+                                <div class="score-num" id="away-score-@m.Id">@awayScore</div>
+                            </div>
+                            <div class="match-team @(!homeServing ? "serving" : "")" style="text-align:right">
+                                <div class="match-team-name" style="text-align:right">
+                                    <a href="/Live/Team/@m.AwayTeamId">@m.AwayTeam?.Name</a>
+                                </div>
+                                <div class="sets-won-dots" style="justify-content:flex-end" id="away-sets-@m.Id">
+                                    @for (int i = 0; i < setsToWin; i++)
+                                    {
+                                        <span class="set-dot-mini @(i < awaySets ? "won" : "")"></span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
 
         <!-- ── POOL STANDINGS ─────────────────────────────────────────────── -->
         @foreach (var ts in Model.TournamentStandings)
@@ -473,60 +473,85 @@
 @section Scripts {
 <script>
 (function () {
-    // ── SignalR: join all live match groups for real-time score pushes ────────
-    var liveMatchIds = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.LiveMatches.Select(m => m.Id).ToList()));
+    // Tracks which match groups we have already joined (avoids duplicate invokes)
+    var joinedGroups = new Set();
 
     var connection = new signalR.HubConnectionBuilder()
         .withUrl('/scoreHub')
-        .withAutomaticReconnect()
+        .withAutomaticReconnect([0, 2000, 5000, 10000, 15000, 30000])
         .build();
 
+    // ── Join all match groups currently visible on the page ──────────────────
+    function joinVisibleMatchGroups() {
+        document.querySelectorAll('[id^="live-match-"]').forEach(function (el) {
+            var id = parseInt(el.id.replace('live-match-', ''), 10);
+            if (!isNaN(id) && !joinedGroups.has(id)) {
+                joinedGroups.add(id);
+                connection.invoke('JoinMatchGroup', id).catch(console.error);
+            }
+        });
+    }
+
+    // ── Handle incoming score updates from the hub ───────────────────────────
     connection.on('ScoreUpdated', function (data) {
-        if (!data) return;
+        if (!data || !data.matchId) return;
         var matchId = data.matchId;
 
-        // Update scores
+        // Current set score
         var homeEl = document.getElementById('home-score-' + matchId);
         var awayEl = document.getElementById('away-score-' + matchId);
-        if (homeEl) homeEl.textContent = data.homeScore ?? homeEl.textContent;
-        if (awayEl) awayEl.textContent = data.awayScore ?? awayEl.textContent;
+        if (homeEl) { homeEl.textContent = data.homeScore; flashScore(homeEl); }
+        if (awayEl) { awayEl.textContent = data.awayScore; flashScore(awayEl); }
 
-        // Update set dots
-        updateSetDots('home-sets-' + matchId, data.homeSetsWon, data.totalSets);
-        updateSetDots('away-sets-' + matchId, data.awaySetsWon, data.totalSets);
+        // Set-won dots
+        updateSetDots('home-sets-' + matchId, data.homeSetsWon);
+        updateSetDots('away-sets-' + matchId, data.awaySetsWon);
 
-        // Serving indicator
+        // Serving indicator — first .match-team is home, second is away
         var card = document.getElementById('live-match-' + matchId);
         if (card) {
-            var rows = card.querySelectorAll('.match-team');
-            if (rows.length === 2) {
-                rows[0].classList.toggle('serving', !!data.homeIsServing);
-                rows[1].classList.toggle('serving', !data.homeIsServing);
+            var teams = card.querySelectorAll('.match-team');
+            if (teams.length >= 2) {
+                teams[0].classList.toggle('serving', !!data.homeIsServing);
+                teams[1].classList.toggle('serving', !data.homeIsServing);
             }
         }
 
-        // If match completed, reload standings section after a short delay
+        // Set / match info chip
+        var badge = card && card.querySelector('.live-card-badge');
+        if (badge) {
+            badge.innerHTML =
+                '<span class="live-dot" style="width:6px;height:6px"></span>' +
+                'Live &middot; Set ' + data.currentSetNumber + ' of ' + data.totalSets;
+        }
+
+        // Refresh entire content when match completes (standings change)
         if (data.matchCompleted) {
             setTimeout(refreshContent, 1500);
         }
+
+        // Stamp the "updated at" time on every score event
+        stampTime();
     });
 
-    function updateSetDots(containerId, setsWon, totalSets) {
+    function flashScore(el) {
+        el.style.transform = 'scale(1.15)';
+        el.style.color = '#fff';
+        setTimeout(function () {
+            el.style.transform = '';
+            el.style.color = '';
+        }, 250);
+    }
+
+    function updateSetDots(containerId, setsWon) {
         var container = document.getElementById(containerId);
         if (!container) return;
-        var dots = container.querySelectorAll('.set-dot-mini');
-        dots.forEach(function (dot, i) {
+        container.querySelectorAll('.set-dot-mini').forEach(function (dot, i) {
             dot.classList.toggle('won', i < setsWon);
         });
     }
 
-    connection.start().then(function () {
-        liveMatchIds.forEach(function (id) {
-            connection.invoke('JoinMatchGroup', id).catch(console.error);
-        });
-    }).catch(console.error);
-
-    // ── DOM-swap refresh: fetch /Live every 60s, replace standings/results ────
+    // ── DOM-swap refresh every 60s ───────────────────────────────────────────
     function refreshContent() {
         fetch('/Live')
             .then(function (r) { return r.text(); })
@@ -536,12 +561,29 @@
                 var curContent = document.getElementById('dynamicContent');
                 if (newContent && curContent) {
                     curContent.innerHTML = newContent.innerHTML;
+                    // Join groups for any matches that appeared after page load
+                    joinVisibleMatchGroups();
                 }
-                document.getElementById('updatedAt').textContent =
-                    'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                stampTime();
             })
             .catch(console.error);
     }
+
+    function stampTime() {
+        var el = document.getElementById('updatedAt');
+        if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ── Reconnect: re-join all groups ────────────────────────────────────────
+    connection.onreconnected(function () {
+        joinedGroups.clear(); // force re-join
+        joinVisibleMatchGroups();
+    });
+
+    // ── Start connection ─────────────────────────────────────────────────────
+    connection.start()
+        .then(joinVisibleMatchGroups)
+        .catch(console.error);
 
     setInterval(refreshContent, 60000);
 })();

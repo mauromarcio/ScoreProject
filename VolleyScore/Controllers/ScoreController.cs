@@ -416,11 +416,13 @@ public class ScoreController : Controller
         return new ScoreUpdateResult
         {
             Success = true,
+            MatchId = match.Id,
             HomeScore = set.HomeScore,
             AwayScore = set.AwayScore,
             HomeSetsWon = match.Sets.Count(s => s.WinnerTeamId == match.HomeTeamId),
             AwaySetsWon = match.Sets.Count(s => s.WinnerTeamId == match.AwayTeamId),
             CurrentSetNumber = match.CurrentSetNumber,
+            TotalSets = match.TotalSets,
             HomeIsServing = set.HomeIsServing,
             SetCompleted = setCompleted,
             MatchCompleted = matchCompleted,

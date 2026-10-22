@@ -57,11 +57,13 @@ public class ScoreUpdateResult
 {
     public bool Success { get; set; }
     public string? Error { get; set; }
+    public int MatchId { get; set; }
     public int HomeScore { get; set; }
     public int AwayScore { get; set; }
     public int HomeSetsWon { get; set; }
     public int AwaySetsWon { get; set; }
     public int CurrentSetNumber { get; set; }
+    public int TotalSets { get; set; }
     public bool HomeIsServing { get; set; }
     public bool SetCompleted { get; set; }
     public bool MatchCompleted { get; set; }
