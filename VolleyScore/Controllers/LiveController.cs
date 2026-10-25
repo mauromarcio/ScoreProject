@@ -37,6 +37,8 @@ public class LiveController : Controller
             .Include(tm => tm.Tournament)
             .Include(tm => tm.Pool)
             .Include(tm => tm.Match).ThenInclude(m => m!.Sets)
+            .Include(tm => tm.Match).ThenInclude(m => m!.HomeTeam)
+            .Include(tm => tm.Match).ThenInclude(m => m!.AwayTeam)
             .Where(tm => (tm.HomeTeamId == id || tm.AwayTeamId == id) && tm.Match != null)
             .ToListAsync();
 

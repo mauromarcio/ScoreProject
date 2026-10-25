@@ -98,6 +98,19 @@ public class TeamsController : Controller
         return View(teams);
     }
 
+    // GET: Teams/TraditionalLineups
+    public async Task<IActionResult> TraditionalLineups()
+    {
+        var tournaments = await _context.Tournaments
+            .Where(t => t.Status != TournamentStatus.Setup)
+            .Include(t => t.TournamentTeams)
+                .ThenInclude(tt => tt.Team)
+                    .ThenInclude(team => team.Players)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+        return View(tournaments);
+    }
+
     // GET: Teams/Delete/5
     public async Task<IActionResult> Delete(int id)
     {
