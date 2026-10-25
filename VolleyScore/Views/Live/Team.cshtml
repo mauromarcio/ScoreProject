@@ -142,10 +142,11 @@
     border-radius: 20px;
     flex-shrink: 0;
 }
-.outcome-w { background: rgba(34,197,94,.15); color: #22c55e; border: 1px solid rgba(34,197,94,.3); }
-.outcome-l { background: rgba(248,113,113,.1); color: #f87171; border: 1px solid rgba(248,113,113,.25); }
+.outcome-w    { background: rgba(34,197,94,.15);  color: #22c55e; border: 1px solid rgba(34,197,94,.3); }
+.outcome-l    { background: rgba(248,113,113,.1); color: #f87171; border: 1px solid rgba(248,113,113,.25); }
+.outcome-t    { background: rgba(148,163,184,.10);color: #94a3b8; border: 1px solid rgba(148,163,184,.3); }
 .outcome-live { background: rgba(251,191,36,.12); color: #fbbf24; border: 1px solid rgba(251,191,36,.3); }
-.outcome-ns   { background: rgba(148,163,184,.08); color: #64748b; border: 1px solid rgba(148,163,184,.15); }
+.outcome-ns   { background: rgba(148,163,184,.08);color: #64748b; border: 1px solid rgba(148,163,184,.15); }
 .tournament-label {
     font-size: .7rem;
     font-weight: 700;
@@ -216,19 +217,27 @@
                     int teamSets  = isHome ? m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId) : m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId);
                     int oppSets   = isHome ? m.Sets.Count(s => s.WinnerTeamId == m.AwayTeamId) : m.Sets.Count(s => s.WinnerTeamId == m.HomeTeamId);
                     var opp       = isHome ? m.AwayTeam : m.HomeTeam;
-                    bool won = teamSets > oppSets;
-                    bool lost = oppSets > teamSets;
+                    bool won  = teamSets > oppSets;
+                    bool tied = teamSets == oppSets && m.Status == MatchStatus.Completed;
                     string outcomeClass = m.Status == MatchStatus.Completed
-                        ? (won ? "outcome-w" : "outcome-l")
+                        ? (won ? "outcome-w" : tied ? "outcome-t" : "outcome-l")
                         : m.Status == MatchStatus.InProgress ? "outcome-live" : "outcome-ns";
                     string outcomeLabel = m.Status == MatchStatus.Completed
-                        ? (won ? "W" : "L")
+                        ? (won ? "W" : tied ? "T" : "L")
                         : m.Status == MatchStatus.InProgress ? "Live" : "–";
+                    // Set-by-set scores (home score – away score per set)
+                    var setScores = m.Sets.OrderBy(s => s.SetNumber)
+                        .Where(s => s.HomeScore > 0 || s.AwayScore > 0 || s.WinnerTeamId != null)
+                        .Select(s => $"{s.HomeScore}–{s.AwayScore}")
+                        .ToList();
                     <div class="match-result-card">
                         <div class="mr-teams">
                             <div class="mr-home">@team.Name</div>
-                            <div class="mr-vs">vs</div>
-                            <div class="mr-away">@(opp?.Name ?? "TBD")</div>
+                            <div class="mr-vs">vs  @(opp?.Name ?? "TBD")</div>
+                            @if (setScores.Any())
+                            {
+                                <div class="mr-vs" style="letter-spacing:.02em">@string.Join(" · ", setScores)</div>
+                            }
                         </div>
                         <div class="mr-score">@teamSets – @oppSets</div>
                         <div class="mr-outcome @outcomeClass">@outcomeLabel</div>
