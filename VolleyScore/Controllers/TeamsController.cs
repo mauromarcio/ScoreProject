@@ -102,7 +102,7 @@ public class TeamsController : Controller
     public async Task<IActionResult> TraditionalLineups()
     {
         var tournaments = await _context.Tournaments
-            .Where(t => t.Status != TournamentStatus.Setup)
+            .Where(t => t.Status != TournamentStatus.Setup && t.ShowResultsOnLive)
             .Include(t => t.TournamentTeams)
                 .ThenInclude(tt => tt.Team)
                     .ThenInclude(team => team.Players)

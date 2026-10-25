@@ -68,17 +68,7 @@
     letter-spacing: .04em;
     white-space: nowrap;
 }
-.info-field { display:flex; align-items:flex-end; gap:2px; }
-.info-line { display:inline-block; border-bottom:1px solid #444; height:4.5mm; }
-.info-line-md { min-width:35mm; }
-.info-line-sm { min-width:25mm; }
-.check-box {
-    width:9px; height:9px;
-    border:1.5px solid #444;
-    display:inline-block;
-    vertical-align:middle;
-    margin-right:2px;
-}
+.info-field { display:flex; align-items:center; gap:4px; }
 
 /* Main body — roster left, sets right */
 .main-body { display:flex; gap:4mm; align-items:flex-start; }
@@ -276,14 +266,7 @@ else
             </div>
 
             <div class="info-row">
-                <div class="info-field">TEAM:&nbsp;<span class="info-line info-line-md"></span></div>
-                <div class="info-field">DATE:&nbsp;<span class="info-line info-line-sm"></span></div>
-                <div class="info-field" style="gap:4px">
-                    CHECK ONE:
-                    <span class="check-box"></span>HOME
-                    &nbsp;
-                    <span class="check-box"></span>VISITOR
-                </div>
+                <div class="info-field">TEAM:&nbsp;<strong>@team.Name</strong></div>
             </div>
 
             <div class="main-body">
@@ -318,9 +301,11 @@ else
                         <div class="set-header-row">
                             <div class="set-icon-cell">
                                 <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#0d9488" stroke-width="2"/>
-                                    <path d="M10 1a9 9 0 0 1 0 18" stroke="#0d9488" stroke-width="1.5" fill="none"/>
-                                    <path d="M5 4.5C7 7 7 13 5 15.5" stroke="#0d9488" stroke-width="1.2" fill="none"/>
+                                    <!-- volleyball: ball + three curved panel seams -->
+                                    <circle cx="10" cy="10" r="8.5" fill="#e6f7f6" stroke="#0d9488" stroke-width="1.4"/>
+                                    <path d="M1.8,8 C5,2.5 15,2.5 18.2,8" stroke="#0d9488" stroke-width="1.1" fill="none"/>
+                                    <path d="M1.8,8 C3,14.5 6.5,18.5 10,19" stroke="#0d9488" stroke-width="1.1" fill="none"/>
+                                    <path d="M18.2,8 C17,14.5 13.5,18.5 10,19" stroke="#0d9488" stroke-width="1.1" fill="none"/>
                                 </svg>
                             </div>
                             <div class="set-label">SET 1</div>
@@ -344,9 +329,10 @@ else
                         <div class="set-header-row">
                             <div class="set-icon-cell">
                                 <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="10" cy="10" r="9" stroke="#0d9488" stroke-width="2"/>
-                                    <path d="M10 1a9 9 0 0 1 0 18" stroke="#0d9488" stroke-width="1.5" fill="none"/>
-                                    <path d="M5 4.5C7 7 7 13 5 15.5" stroke="#0d9488" stroke-width="1.2" fill="none"/>
+                                    <circle cx="10" cy="10" r="8.5" fill="#e6f7f6" stroke="#0d9488" stroke-width="1.4"/>
+                                    <path d="M1.8,8 C5,2.5 15,2.5 18.2,8" stroke="#0d9488" stroke-width="1.1" fill="none"/>
+                                    <path d="M1.8,8 C3,14.5 6.5,18.5 10,19" stroke="#0d9488" stroke-width="1.1" fill="none"/>
+                                    <path d="M18.2,8 C17,14.5 13.5,18.5 10,19" stroke="#0d9488" stroke-width="1.1" fill="none"/>
                                 </svg>
                             </div>
                             <div class="set-label">SET 2</div>
